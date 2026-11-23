@@ -1,0 +1,815 @@
+<title>Minda Furnace HMI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: control-room HMI. Status strip on top, operator inputs left, live trend centre,
+   the approve/PLC loop beneath, evidence (savings, AI learning, impact) at the bottom. */
+:root{
+  --bg:#0e131a; --panel:#151c26; --panel-2:#1b2431; --line:#273242; --fg:#e4e9ef; --muted:#8a97a8;
+  --molten:#ff7b1c; --molten-2:#ffb15c; --molten-soft:rgba(255,123,28,.14);
+  --setpoint:#49c2d8; --setpoint-soft:rgba(73,194,216,.14);
+  --ok:#3fcf8e; --warn:#f3b63c; --crit:#ff5a6c; --ghost:#5d6a7c;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#edf0f3; --panel:#ffffff; --panel-2:#f4f6f8; --line:#d5dbe2; --fg:#16202b; --muted:#566476;
+  --molten:#d35400; --molten-2:#e9822f; --molten-soft:rgba(211,84,0,.10);
+  --setpoint:#0a7f97; --setpoint-soft:rgba(10,127,151,.10);
+  --ok:#11845a; --warn:#9a6400; --crit:#c42638; --ghost:#9aa5b3; color-scheme:light } }
+:root[data-theme="light"]{
+  --bg:#edf0f3; --panel:#ffffff; --panel-2:#f4f6f8; --line:#d5dbe2; --fg:#16202b; --muted:#566476;
+  --molten:#d35400; --molten-2:#e9822f; --molten-soft:rgba(211,84,0,.10);
+  --setpoint:#0a7f97; --setpoint-soft:rgba(10,127,151,.10);
+  --ok:#11845a; --warn:#9a6400; --crit:#c42638; --ghost:#9aa5b3; color-scheme:light }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px}
+.wrap{max-width:1440px;margin:0 auto;display:grid;gap:14px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.label{font-family:var(--f-display);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--setpoint);outline-offset:2px}
+
+/* header */
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.crucible{width:38px;height:38px;flex:none}
+.brand h1{font-size:24px;font-weight:700;line-height:1.1}
+.brand p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.status{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;background:var(--panel);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.idle{background:var(--ghost)}
+.dot.live{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.themebtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:pointer}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--panel);padding:12px 14px;min-width:0}
+.kpi .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:26px;font-weight:600;line-height:1.15;margin-top:4px;white-space:nowrap}
+.kpi .v small{font-size:13px;font-weight:400;color:var(--muted);margin-left:3px}
+.kpi .sub{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.hot .v{color:var(--molten)}
+.kpi.sp .v{color:var(--setpoint)}
+
+/* grid */
+.row{display:grid;gap:14px;align-items:start}
+.r1{grid-template-columns:minmax(0,4fr) minmax(0,8fr)}
+.r2{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.r3{grid-template-columns:minmax(0,6fr) minmax(0,6fr)}
+.r4{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0;display:grid;gap:14px}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ph h2{font-size:18px;font-weight:600}
+.ph .step{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+
+/* form */
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.field{display:grid;gap:4px;min-width:0}
+.field.full{grid-column:1/-1}
+.field label{font-size:12.5px;color:var(--muted)}
+.field select,.field input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-family:var(--f-mono);font-size:14px}
+.field .hint{font-size:11.5px;color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:9px 14px;font-family:var(--f-display);font-weight:600;font-size:14.5px;letter-spacing:.02em;cursor:pointer;transition:filter .15s,background .15s}
+.btn:hover{filter:brightness(1.12)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.primary{background:var(--setpoint);border-color:var(--setpoint);color:#04161b}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#03190f}
+.btn.stop{background:transparent;border-color:var(--crit);color:var(--crit)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+
+/* prediction breakdown */
+.breakdown{display:grid;gap:6px}
+.bk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center}
+.bk .bar{grid-column:1/-1;height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
+.bk .bar i{display:block;height:100%;background:var(--molten);opacity:.85}
+.bk.loss .bar i{background:var(--ghost)}
+.bk span:first-child{font-size:13px}
+.bk span:last-child{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.compare{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cmp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2);min-width:0}
+.cmp .n{font-family:var(--f-mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.cmp .t{font-size:11.5px;color:var(--muted)}
+.cmp.ai{border-color:var(--molten);background:var(--molten-soft)}
+
+/* trend */
+.trend svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.stages{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.stage{font-size:11.5px;text-align:center;padding:6px 2px;border-radius:5px;background:var(--panel-2);color:var(--muted);border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage.done{color:var(--fg)}
+.stage.done::before{content:"✓ ";color:var(--ok)}
+.stage.now{border-color:var(--molten);color:var(--molten);background:var(--molten-soft);font-weight:600}
+.runbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.speed{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.speed button{border:0;background:var(--panel-2);padding:6px 10px;font-family:var(--f-mono);font-size:12.5px;cursor:pointer}
+.speed button[aria-pressed="true"]{background:var(--setpoint-soft);color:var(--setpoint)}
+
+/* recommendation */
+.rec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.rp{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel-2);min-width:0}
+.rp .n{font-family:var(--f-mono);font-size:21px;font-weight:600;color:var(--setpoint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rp .n small{font-size:12px;color:var(--muted);font-weight:400;margin-left:2px}
+.rp .t{font-size:12px;color:var(--muted)}
+.why{font-size:13px;color:var(--muted);margin:0}
+.approval{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;border:1px dashed var(--line);border-radius:8px;padding:10px 12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px;font-family:var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+.pill.wait{background:rgba(243,182,60,.15);color:var(--warn)}
+.pill.ok{background:rgba(63,207,142,.15);color:var(--ok)}
+.pill.bad{background:rgba(255,90,108,.14);color:var(--crit)}
+.pill.idle{background:var(--panel-2);color:var(--muted)}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin:0;padding:0;list-style:none}
+.checks li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:6px;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}
+.checks .ic{width:14px;height:14px;border-radius:50%;border:2px solid var(--ghost)}
+.checks li.pass .ic{border-color:var(--ok);background:var(--ok)}
+.checks li.fail .ic{border-color:var(--crit);background:var(--crit)}
+.checks li.run .ic{border-color:var(--setpoint);border-top-color:transparent;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.checks .val{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* loop diagram */
+.loop svg{width:100%;height:auto;display:block}
+.loop .node rect{fill:var(--panel-2);stroke:var(--line);stroke-width:1.5}
+.loop .node text{fill:var(--fg);font-family:var(--f-display);font-size:14px;font-weight:600}
+.loop .node .s{fill:var(--muted);font-family:var(--f-body);font-size:11.5px;font-weight:400}
+.loop .node.on rect{stroke:var(--molten);fill:var(--molten-soft)}
+.loop .node.on text{fill:var(--molten)}
+.loop .edge{stroke:var(--ghost);stroke-width:1.6;fill:none}
+.loop .edge.on{stroke:var(--molten);stroke-dasharray:6 5;animation:flow .8s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+.loop .ah{fill:var(--ghost)}
+
+/* bars + scatter */
+.bars svg,.scatter svg{width:100%;height:auto;display:block}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.tabs button{border:0;background:var(--panel-2);padding:5px 10px;font-size:12.5px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--molten-soft);color:var(--molten);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.st{border-left:3px solid var(--line);padding:2px 0 2px 10px;min-width:0}
+.st .n{font-family:var(--f-mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.st .t{font-size:12px;color:var(--muted)}
+.st.good{border-color:var(--ok)} .st.bad{border-color:var(--ghost)}
+
+/* impact */
+.impact{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.imp{padding:12px;border-radius:8px;background:var(--panel-2);min-width:0}
+.imp .n{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.imp .t{font-size:12.5px;color:var(--muted)}
+.assume{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
+.assume .field{width:auto;min-width:120px;flex:1}
+.audience{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.audience li{font-size:13px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.audience b{display:block;font-family:var(--f-display);font-size:14px;margin-bottom:2px}
+
+/* log */
+.log{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto;display:grid;gap:0;font-size:13px}
+.log li{display:grid;grid-template-columns:62px 14px minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.log time{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.log .lv{width:8px;height:8px;border-radius:50%;background:var(--ghost);align-self:center}
+.log .lv.i{background:var(--setpoint)} .log .lv.o{background:var(--ok)} .log .lv.w{background:var(--warn)} .log .lv.c{background:var(--crit)} .log .lv.h{background:var(--molten)}
+
+footer{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.note{font-size:12px;color:var(--muted);margin:0}
+
+@media (max-width:1100px){
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .r1,.r2,.r3,.r4{grid-template-columns:minmax(0,1fr)}
+  .impact{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:620px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi .v{font-size:21px}
+  .rec{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .checks,.audience{grid-template-columns:minmax(0,1fr)}
+  .stages{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .compare,.stats{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .brand h1{font-size:20px}
+}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="crucible" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M7 9h26l-3 22a4 4 0 0 1-4 3.5H14A4 4 0 0 1 10 31z" fill="none" stroke="var(--muted)" stroke-width="2.4"/>
+        <path d="M10.6 17h18.8l-1.7 13.4a2.4 2.4 0 0 1-2.4 2.1H14.7a2.4 2.4 0 0 1-2.4-2.1z" fill="var(--molten)"/>
+        <path d="M4 13h3M4 20h4M4 27h5M33 13h3M32 20h4M31 27h5" stroke="var(--setpoint)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Induction Furnace IF-01 · Thermal Optimizer</h1>
+        <p>Physics + AI + model predictive control, with operator approval and PLC safety interlocks</p>
+      </div>
+    </div>
+    <div class="status">
+      <span class="chip"><span class="dot" id="edgeDot"></span>Edge node: Raspberry Pi</span>
+      <span class="chip"><span class="dot" id="plcDot"></span><span id="plcTxt">PLC link OK</span></span>
+      <span class="chip"><span class="dot idle" id="modeDot"></span><span id="modeTxt">Awaiting approval</span></span>
+      <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle colour theme">Theme</button>
+    </div>
+  </header>
+
+  <!-- KPI strip -->
+  <section class="kpis" aria-label="Live furnace readings">
+    <div class="kpi hot"><div class="label">Bath temperature</div><div class="v" id="kTemp">30<small>°C</small></div><div class="sub" id="kTempSub">Target 1500 °C</div></div>
+    <div class="kpi"><div class="label">Coil power</div><div class="v" id="kPow">0<small>kW</small></div><div class="sub" id="kPowSub">Rated 750 kW</div></div>
+    <div class="kpi"><div class="label">Energy this heat</div><div class="v" id="kEn">0<small>kWh</small></div><div class="sub" id="kEnSub">Predicted 0 kWh</div></div>
+    <div class="kpi sp"><div class="label">Time to tap</div><div class="v" id="kTime">--<small>min</small></div><div class="sub" id="kTimeSub">Elapsed 0 min</div></div>
+    <div class="kpi"><div class="label">Specific energy</div><div class="v" id="kSpec">--<small>kWh/t</small></div><div class="sub" id="kSpecSub">Baseline -- kWh/t</div></div>
+    <div class="kpi"><div class="label">Melt stage</div><div class="v" id="kStage" style="font-family:var(--f-display);font-size:22px">Idle</div><div class="sub" id="kStageSub">No heat running</div></div>
+  </section>
+
+  <!-- Row 1: inputs + prediction | live trend -->
+  <div class="row r1">
+    <div class="row" style="grid-template-columns:minmax(0,1fr)">
+      <section class="panel" aria-labelledby="h-in">
+        <div class="ph"><h2 id="h-in">Heat setup</h2><span class="step">1 · Operator input</span></div>
+        <form class="form" id="heatForm">
+          <div class="field full">
+            <label for="grade">Metal grade</label>
+            <select id="grade"></select>
+          </div>
+          <div class="field">
+            <label for="mass">Charge weight (kg)</label>
+            <input id="mass" type="number" min="100" max="2000" step="50" value="1200">
+            <span class="hint">Crucible capacity 1500 kg</span>
+          </div>
+          <div class="field">
+            <label for="t0">Initial temp (°C)</label>
+            <input id="t0" type="number" min="0" max="900" step="5" value="30">
+            <span class="hint">Cold charge ≈ ambient</span>
+          </div>
+          <div class="field full">
+            <label for="tt">Target tap temperature (°C)</label>
+            <input id="tt" type="number" min="500" max="1800" step="5" value="1500">
+            <span class="hint" id="ttHint">Grade limit 1560 °C</span>
+          </div>
+          <div class="field full btns">
+            <button class="btn primary" type="submit" id="planBtn">Compute optimal plan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="h-pred">
+        <div class="ph"><h2 id="h-pred">Energy prediction</h2><span class="step">2 · Physics + AI</span></div>
+        <div class="breakdown" id="breakdown"></div>
+        <div class="compare">
+          <div class="cmp"><div class="t">Physics only</div><div class="n" id="pPhys">--</div><div class="t" id="pPhysT">--</div></div>
+          <div class="cmp ai"><div class="t">AI-corrected</div><div class="n" id="pAI">--</div><div class="t" id="pAIT">--</div></div>
+          <div class="cmp"><div class="t">Manual baseline</div><div class="n" id="pBase">--</div><div class="t" id="pBaseT">--</div></div>
+        </div>
+        <p class="note" id="corrNote">The AI layer corrects the physics model for this furnace's own coil efficiency and heat-loss behaviour.</p>
+      </section>
+    </div>
+
+    <section class="panel trend" aria-labelledby="h-trend">
+      <div class="ph"><h2 id="h-trend">Live melt trend</h2><span class="step">6 · Sensor feedback</span></div>
+      <div class="legend">
+        <span><i style="background:var(--molten)"></i>Actual bath temp</span>
+        <span><i style="background:var(--setpoint)"></i>AI-predicted trajectory</span>
+        <span><i style="background:var(--warn)"></i>Target</span>
+        <span><i style="background:var(--ghost);height:8px;opacity:.5"></i>Coil power</span>
+        <span><i style="background:var(--muted);opacity:.6"></i>Manual baseline</span>
+      </div>
+      <div id="trend" role="img" aria-label="Temperature and power over time"></div>
+      <div class="stages" id="stages"></div>
+      <div class="runbar">
+        <div class="btns">
+          <button class="btn" type="button" id="pauseBtn" disabled>Pause</button>
+          <button class="btn stop" type="button" id="abortBtn" disabled>Emergency stop</button>
+          <button class="btn" type="button" id="resetBtn">New heat</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="label">Sim speed</span>
+          <div class="speed" id="speed">
+            <button type="button" data-s="60" aria-pressed="false">60×</button>
+            <button type="button" data-s="240" aria-pressed="true">240×</button>
+            <button type="button" data-s="600" aria-pressed="false">600×</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Row 2: recommendation + approval + PLC | closed loop -->
+  <div class="row r2">
+    <section class="panel" aria-labelledby="h-rec">
+      <div class="ph"><h2 id="h-rec">MPC recommendation</h2><span class="step">3 · Optimize → 4 · Approve → 5 · PLC</span></div>
+      <div class="rec">
+        <div class="rp"><div class="t">Power setpoint</div><div class="n" id="rP">--</div></div>
+        <div class="rp"><div class="t">Ramp rate</div><div class="n" id="rR">--</div></div>
+        <div class="rp"><div class="t">Stage transition</div><div class="n" id="rS">--</div></div>
+        <div class="rp"><div class="t">Hold time</div><div class="n" id="rH">--</div></div>
+      </div>
+      <p class="why" id="why">--</p>
+      <div class="approval">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span class="pill wait" id="apPill">Awaiting operator</span>
+          <span class="muted" style="font-size:13px" id="apTxt">Review the setpoints, then approve or reject.</span>
+        </div>
+        <div class="btns">
+          <button class="btn stop" type="button" id="rejectBtn">Reject</button>
+          <button class="btn go" type="button" id="approveBtn">Approve &amp; send to PLC</button>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">PLC safety interlocks</div>
+        <ul class="checks" id="checks"></ul>
+      </div>
+    </section>
+
+    <section class="panel loop" aria-labelledby="h-loop">
+      <div class="ph"><h2 id="h-loop">Closed-loop status</h2><span class="muted" style="font-size:12.5px" id="loopTxt">Waiting at operator approval</span></div>
+      <div id="loop"></div>
+      <p class="note">The highlighted block is where the heat currently sits. Nothing reaches the coil without operator approval and a full interlock pass.</p>
+    </section>
+  </div>
+
+  <!-- Row 3: savings | AI learning -->
+  <div class="row r3">
+    <section class="panel bars" aria-labelledby="h-bars">
+      <div class="ph"><h2 id="h-bars">Without vs with the optimizer</h2>
+        <div class="tabs" role="tablist" id="barTabs">
+          <button type="button" role="tab" aria-selected="true" data-k="heat">This heat (model)</button>
+          <button type="button" role="tab" aria-selected="false" data-k="proto">Prototype results</button>
+        </div>
+      </div>
+      <div id="bars" role="img" aria-label="Energy, melting time and efficiency comparison"></div>
+      <p class="note" id="barNote">--</p>
+    </section>
+
+    <section class="panel scatter" aria-labelledby="h-ai">
+      <div class="ph"><h2 id="h-ai">AI correction: learning from past heats</h2><span class="step">Historical data</span></div>
+      <div class="stats">
+        <div class="st bad"><div class="n" id="mapePhys">--</div><div class="t">Physics-only error (MAPE)</div></div>
+        <div class="st good"><div class="n" id="mapeAI">--</div><div class="t">AI-corrected error (MAPE)</div></div>
+        <div class="st"><div class="n" id="nHeats">--</div><div class="t">Heats in training set</div></div>
+      </div>
+      <div id="scatter" role="img" aria-label="Predicted versus actual energy for historical heats"></div>
+      <p class="note">Each dot is a past heat: predicted energy (x) against metered energy (y). Points on the diagonal are perfect predictions. Illustrative sample history for IF-01.</p>
+    </section>
+  </div>
+
+  <!-- Row 4: impact | log -->
+  <div class="row r4">
+    <section class="panel" aria-labelledby="h-imp">
+      <div class="ph"><h2 id="h-imp">Plant impact projection</h2><span class="muted" style="font-size:12.5px">Based on the current heat plan</span></div>
+      <div class="impact">
+        <div class="imp"><div class="n" id="iEn" style="color:var(--ok)">--</div><div class="t">Energy saved per year</div></div>
+        <div class="imp"><div class="n" id="iCost">--</div><div class="t">Electricity cost saved per year</div></div>
+        <div class="imp"><div class="n" id="iCO2">--</div><div class="t">CO₂ avoided per year</div></div>
+        <div class="imp"><div class="n" id="iHrs">--</div><div class="t">Furnace hours freed per year</div></div>
+      </div>
+      <form class="assume" id="assume" onsubmit="return false">
+        <div class="field"><label for="aHeats">Heats per day</label><input id="aHeats" type="number" min="1" max="40" value="12"></div>
+        <div class="field"><label for="aDays">Operating days</label><input id="aDays" type="number" min="1" max="365" value="300"></div>
+        <div class="field"><label for="aTariff">Tariff (₹/kWh)</label><input id="aTariff" type="number" min="1" max="30" step="0.5" value="8"></div>
+        <div class="field"><label for="aGrid">Grid CO₂ (kg/kWh)</label><input id="aGrid" type="number" min="0" max="2" step="0.01" value="0.71"></div>
+      </form>
+      <ul class="audience">
+        <li><b>Foundry operators</b>Clear, actionable setpoints with a single approve step.</li>
+        <li><b>Plant managers</b>Lower kWh per tonne and more heats per shift.</li>
+        <li><b>Industry</b>A smaller carbon footprint per casting.</li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="h-log">
+      <div class="ph"><h2 id="h-log">Event log</h2><span class="muted" style="font-size:12.5px">Heat clock</span></div>
+      <ul class="log" id="log"></ul>
+    </section>
+  </div>
+
+  <footer>
+    <span>THE MINDA PROJECT · Intelligent Thermal Optimization and Predictive Control for Induction Furnaces</span>
+    <span>Sakthi Hackathon 1.0 · MCET</span>
+  </footer>
+  <p class="note">Furnace behaviour on this page comes from a simulated lumped-enthalpy thermal model (sensible + latent heat, coil efficiency, radiative/conductive losses). “Prototype results” are the figures from the project deck. Replace the simulator with the Raspberry Pi sensor feed to run it live.</p>
+</div>
+
+<script>
+/* ===================== Thermal model ===================== */
+const GRADES = {
+  gci:{name:'Grey cast iron FG260', cps:540, L:230e3, cpl:850, Tm:1200, tgt:1500, max:1560, hold:5},
+  sgi:{name:'SG iron 500/7',        cps:540, L:230e3, cpl:850, Tm:1150, tgt:1480, max:1540, hold:6},
+  cs: {name:'Carbon steel C20',     cps:620, L:270e3, cpl:820, Tm:1510, tgt:1620, max:1680, hold:4},
+  ss: {name:'Stainless steel 304',  cps:600, L:280e3, cpl:800, Tm:1450, tgt:1600, max:1650, hold:4},
+  al: {name:'Aluminium A356',       cps:1000,L:390e3, cpl:1180,Tm:615,  tgt:720,  max:780,  hold:3},
+  cu: {name:'Copper ETP',           cps:420, L:205e3, cpl:500, Tm:1085, tgt:1200, max:1250, hold:3}
+};
+const FURNACE = {cap:1500, Prated:750, rampMax:60, Ta:30, K:0.040};   // K: kW lost per °C above ambient
+const PLANT   = {etaMul:0.965, kMul:1.25};   // how IF-01 actually behaves (worn lining, older coil)
+const LEARNED = {etaMul:0.962, kMul:1.23};   // what the AI learned from historical heats
+const NOMINAL = {etaMul:1, kMul:1};          // textbook physics
+const BASE_PRACTICE = {ramp:40, preheat:{frac:0.5,min:15}, overshoot:40, holdMin:18};
+
+const eta = P => 0.80 - 0.17*Math.pow(Math.max(P,0)/FURNACE.Prated, 2.5);
+const Hof = (g,T) => T<g.Tm ? g.cps*T : g.cps*g.Tm + g.L + g.cpl*(T-g.Tm);
+function Tof(g,H){ const h1=g.cps*g.Tm, h2=h1+g.L; if(H<h1) return H/g.cps; if(H<h2) return g.Tm; return g.Tm+(H-h2)/g.cpl; }
+function meltFrac(g,H){ const h1=g.cps*g.Tm; return Math.min(1,Math.max(0,(H-h1)/g.L)); }
+
+function makeSim(o){
+  const g=o.g, s={t:0,H:Hof(g,o.T0),P:0,E:0,phase:'ramp',hold:0,done:false,T:o.T0,tReach:null,aborted:false};
+  const target=o.Tt+(o.overshoot||0);
+  s.step=function(dt){
+    if(s.done) return;
+    const T=Tof(g,s.H), loss=FURNACE.K*o.kMul*(T-FURNACE.Ta);
+    if(s.phase!=='hold' && T>=target){ s.phase='hold'; s.tReach=s.t; }
+    if(s.phase==='hold'){ s.P=loss/(eta(s.P||100)*o.etaMul); s.hold+=dt; }
+    else{
+      let Pd;
+      if(o.preheat && s.t<o.preheat.min*60) Pd=o.P*o.preheat.frac;
+      else if(T>=o.stageT) Pd=o.P*o.stageFrac; else Pd=o.P;
+      s.P = Pd>s.P ? Math.min(Pd, s.P+o.ramp*dt/60) : Pd;
+      const h1=g.cps*g.Tm;
+      s.phase = s.t<60*3 && s.P<Pd-1 ? 'ramp' : (s.H<h1 ? 'heat' : (s.H<h1+g.L ? 'melt' : (T>=o.stageT ? 'approach' : 'superheat')));
+    }
+    s.H += (eta(s.P)*o.etaMul*s.P - loss)*1000*dt/o.m;
+    s.E += s.P*dt/3600; s.t += dt; s.T = Tof(g,s.H);
+    if(s.phase==='hold' && s.hold>=o.holdMin*60){ s.done=true; s.phase='tap'; }
+    if(s.t>6*3600) s.done=true;
+  };
+  return s;
+}
+function simulate(o,every){
+  const s=makeSim(o), out=[[0,o.T0,0]]; every=every||30; let k=0;
+  while(!s.done){ s.step(10); if((++k)%(every/10)===0) out.push([s.t/60,s.T,s.P]); }
+  out.push([s.t/60,s.T,s.P]);
+  return {E:s.E, t:s.t/60, tReach:(s.tReach||s.t)/60, samples:out};
+}
+const TIME_COST = 25; // ₹ per furnace-minute (production value)
+function optimise(g,m,T0,Tt,tariff){
+  const ramp = Math.min(FURNACE.rampMax, T0<200?50:60); let best=null, n=0;
+  for(let f=0.4; f<=1.0001; f+=0.05) for(const off of [30,50,70,90]){
+    if(Tt-off<=Math.max(T0,g.Tm)) continue;
+    const o={g,m,T0,Tt,P:Math.round(FURNACE.Prated*f/5)*5,ramp,stageT:Tt-off,stageFrac:0.45,holdMin:g.hold,...LEARNED};
+    const r=simulate(o,60); n++;
+    const J=r.E*tariff + r.t*TIME_COST;
+    if(!best||J<best.J) best={J,o,r};
+  }
+  if(!best){ const o={g,m,T0,Tt,P:Math.round(FURNACE.Prated*0.8),ramp,stageT:Tt-10,stageFrac:0.45,holdMin:g.hold,...LEARNED}; best={o,r:simulate(o,60)}; }
+  best.n=n; return best;
+}
+function baselineOpts(g,m,T0,Tt){ return {g,m,T0,Tt,P:FURNACE.Prated,stageT:Infinity,stageFrac:1,...BASE_PRACTICE,...PLANT}; }
+
+/* ===================== Seeded historical data ===================== */
+function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function gauss(r){ return Math.sqrt(-2*Math.log(r()+1e-9))*Math.cos(2*Math.PI*r()); }
+const HIST=(function(){
+  const r=rng(1907), keys=['gci','gci','gci','sgi','sgi','cs','ss','al','cu'], out=[];
+  for(let i=0;i<148;i++){
+    const g=GRADES[keys[Math.floor(r()*keys.length)]];
+    const m=Math.round((500+r()*1000)/50)*50, P=Math.round((0.6+r()*0.4)*FURNACE.Prated);
+    const o={g,m,T0:30,Tt:g.tgt,P,ramp:50,stageT:g.tgt-50,stageFrac:0.45,holdMin:g.hold};
+    const phys=simulate({...o,...NOMINAL},300).E, ai=simulate({...o,...LEARNED},300).E;
+    const actual=simulate({...o,...PLANT},300).E*(1+gauss(r)*0.022);
+    out.push({phys,ai,actual});
+  }
+  return out;
+})();
+
+/* ===================== State ===================== */
+const $=id=>document.getElementById(id);
+const S={plan:null,base:null,phys:null,state:'await',sim:null,samples:[],speed:240,paused:false,lastFrame:0,
+  checksDone:false,logT:0,nextReplan:5,stagesSeen:new Set(),barMode:'heat',started:false};
+const fmt=(v,d=0)=>Number(v).toLocaleString('en-IN',{maximumFractionDigits:d,minimumFractionDigits:d});
+const clock=min=>{const m=Math.max(0,Math.floor(min)), s=Math.floor((min-m)*60); return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');};
+
+function log(msg,lv){
+  const li=document.createElement('li');
+  const t=S.sim?S.sim.t/60:0;
+  li.innerHTML=`<time>T+${clock(t)}</time><span class="lv ${lv||''}"></span><span></span>`;
+  li.lastChild.textContent=msg;
+  $('log').prepend(li);
+}
+
+/* ===================== Inputs ===================== */
+const gradeSel=$('grade');
+for(const [k,g] of Object.entries(GRADES)){ const o=document.createElement('option'); o.value=k; o.textContent=`${g.name} · melts ${g.Tm} °C`; gradeSel.appendChild(o); }
+gradeSel.addEventListener('change',()=>{ const g=GRADES[gradeSel.value]; $('tt').value=g.tgt; $('ttHint').textContent=`Grade limit ${g.max} °C · liquidus ≈ ${g.Tm} °C`; });
+
+function readInputs(){
+  const g=GRADES[gradeSel.value];
+  return {g, m:+$('mass').value||1200, T0:+$('t0').value||30, Tt:+$('tt').value||g.tgt, tariff:+$('aTariff').value||8};
+}
+
+/* ===================== Plan ===================== */
+function computePlan(silent){
+  stopRun();
+  const I=readInputs(), g=I.g;
+  const best=optimise(g,I.m,I.T0,I.Tt,I.tariff);
+  S.plan=best; S.inputs=I;
+  S.phys=simulate({...best.o,...NOMINAL});
+  S.base=simulate(baselineOpts(g,I.m,I.T0,I.Tt));
+  S.actualPreview=simulate({...best.o,...PLANT});
+  S.state='await'; S.samples=[]; S.sim=null; S.checksDone=false; S.stagesSeen=new Set(); S.nextReplan=5;
+
+  // breakdown (theoretical heat content)
+  const m=I.m, solid=m*g.cps*(Math.min(I.Tt,g.Tm)-I.T0)/3.6e6, latent=I.T0<g.Tm&&I.Tt>=g.Tm?m*g.L/3.6e6:0,
+        superh=I.Tt>g.Tm?m*g.cpl*(I.Tt-Math.max(g.Tm,I.T0))/3.6e6:0, theo=solid+latent+superh,
+        losses=Math.max(0,best.r.E-theo), total=best.r.E;
+  const rows=[['Sensible heat, solid charge',solid],['Latent heat of fusion',latent],['Superheat to tap temperature',superh],['Coil and wall losses (AI-corrected)',losses,'loss']];
+  $('breakdown').innerHTML=rows.map(([n,v,c])=>`<div class="bk ${c||''}"><span>${n}</span><span>${fmt(v)} kWh</span><div class="bar"><i style="width:${(100*v/total).toFixed(1)}%"></i></div></div>`).join('')+
+    `<div class="bk"><span><b>Theoretical melt energy</b> (m·c<sub>p</sub>·ΔT + m·L)</span><span><b>${fmt(theo)} kWh</b></span></div>`;
+  $('pPhys').textContent=fmt(S.phys.E)+' kWh'; $('pPhysT').textContent=fmt(S.phys.t)+' min to tap';
+  $('pAI').textContent=fmt(best.r.E)+' kWh';   $('pAIT').textContent=fmt(best.r.t)+' min to tap';
+  $('pBase').textContent=fmt(S.base.E)+' kWh'; $('pBaseT').textContent=fmt(S.base.t)+' min to tap';
+  $('corrNote').textContent=`Physics alone would under-predict this heat by ${fmt(100*(1-S.phys.E/best.r.E),1)}%. From ${HIST.length} past heats the AI learned that IF-01 runs ${fmt((1-LEARNED.etaMul)*100,1)}% below nominal coil efficiency with ${fmt((LEARNED.kMul-1)*100)}% higher heat loss.`;
+
+  // recommendation
+  const o=best.o;
+  $('rP').innerHTML=`${fmt(o.P)}<small>kW</small>`;
+  $('rR').innerHTML=`${o.ramp}<small>kW/min</small>`;
+  $('rS').innerHTML=`${fmt(o.stageT)}<small>°C</small>`;
+  $('rH').innerHTML=`${o.holdMin}<small>min</small>`;
+  $('why').textContent=`Evaluated ${best.n} candidate trajectories. Running at ${fmt(100*o.P/FURNACE.Prated)}% of rated power keeps coil efficiency at ${fmt(eta(o.P)*100*LEARNED.etaMul,1)}% (vs ${fmt(eta(FURNACE.Prated)*100*LEARNED.etaMul,1)}% at full power). At ${fmt(o.stageT)} °C power drops to ${fmt(o.P*o.stageFrac)} kW so the bath lands on ${fmt(I.Tt)} °C without overshoot.`;
+
+  setApproval('wait'); renderChecks(); setMode('await');
+  $('kTempSub').textContent=`Target ${fmt(I.Tt)} °C`;
+  $('kEnSub').textContent=`Predicted ${fmt(best.r.E)} kWh`;
+  $('kSpecSub').textContent=`Baseline ${fmt(S.base.E/I.m*1000)} kWh/t`;
+  $('kTime').innerHTML=`${fmt(best.r.t)}<small>min</small>`; $('kTimeSub').textContent='Predicted, not started';
+  $('kTemp').innerHTML=`${fmt(I.T0)}<small>°C</small>`; $('kPow').innerHTML=`0<small>kW</small>`; $('kEn').innerHTML=`0<small>kWh</small>`; $('kSpec').innerHTML=`--<small>kWh/t</small>`;
+  $('kStage').textContent='Charged'; $('kStageSub').textContent=`${fmt(I.m)} kg ${g.name}`;
+  renderStages(null); drawTrend(); drawBars(); updateImpact();
+  if(!silent) log(`Plan computed for ${fmt(I.m)} kg ${g.name}: ${fmt(o.P)} kW, predicted ${fmt(best.r.E)} kWh / ${fmt(best.r.t)} min`,'i');
+}
+
+/* ===================== Approval + PLC ===================== */
+function interlocks(){
+  const I=S.inputs, o=S.plan.o;
+  return [
+    ['Power ≤ coil rating', o.P<=FURNACE.Prated, `${fmt(o.P)} / ${FURNACE.Prated} kW`],
+    ['Ramp ≤ inverter limit', o.ramp<=FURNACE.rampMax, `${o.ramp} / ${FURNACE.rampMax} kW/min`],
+    ['Charge ≤ crucible capacity', I.m<=FURNACE.cap, `${fmt(I.m)} / ${fmt(FURNACE.cap)} kg`],
+    ['Target ≤ grade limit', I.Tt<=I.g.max, `${fmt(I.Tt)} / ${fmt(I.g.max)} °C`],
+    ['Coil cooling water flow', true, '212 L/min ≥ 180'],
+    ['Refractory lining wear', true, '46% (limit 80%)'],
+    ['Earth-leakage relay', true, 'Healthy'],
+    ['Tilt and lid interlock', true, 'Locked']
+  ];
+}
+function renderChecks(states){
+  const L=interlocks();
+  $('checks').innerHTML=L.map((c,i)=>`<li class="${states?states[i]||'':''}"><span class="ic"></span><span>${c[0]}</span><span class="val">${c[2]}</span></li>`).join('');
+}
+function setApproval(k,txt){
+  const p=$('apPill'), map={wait:['wait','Awaiting operator'],ok:['ok','Approved'],bad:['bad','Rejected'],blocked:['bad','Blocked by PLC'],run:['ok','Actuated'],done:['idle','Heat complete'],stop:['bad','E-stop']};
+  p.className='pill '+map[k][0]; p.textContent=map[k][1];
+  $('apTxt').textContent=txt||({wait:'Review the setpoints, then approve or reject.',bad:'Plan discarded. Adjust the heat setup and compute again.'}[k]||'');
+  const pending=k==='wait'; $('approveBtn').disabled=!pending; $('rejectBtn').disabled=!pending;
+}
+function approve(){
+  if(S.state!=='await') return;
+  setApproval('ok','Running PLC safety interlocks…'); S.state='checking'; setMode('checking');
+  log('Operator approved setpoints','o');
+  const L=interlocks(), st=L.map(()=>''); let i=0;
+  (function next(){
+    if(i>0) st[i-1]=L[i-1][1]?'pass':'fail';
+    if(i>0 && !L[i-1][1]){ renderChecks(st); S.state='blocked'; setApproval('blocked',`“${L[i-1][0]}” failed. Setpoints were not sent to the coil.`); setMode('blocked'); log(`PLC interlock failed: ${L[i-1][0]} (${L[i-1][2]})`,'c'); return; }
+    if(i>=L.length){ renderChecks(st); S.checksDone=true; startRun(); return; }
+    st[i]='run'; renderChecks(st); i++; setTimeout(next, 170);
+  })();
+}
+function reject(){
+  if(S.state!=='await') return;
+  S.state='rejected'; setApproval('bad'); setMode('rejected'); log('Operator rejected the recommendation','w');
+}
+
+/* ===================== Live run ===================== */
+function startRun(){
+  S.sim=makeSim({...S.plan.o,...PLANT}); S.samples=[[0,S.inputs.T0,0]]; S.state='running'; S.paused=false; S.noise=rng(42);
+  setApproval('run','Setpoints actuated. The MPC re-checks the trajectory every 5 minutes.'); setMode('running');
+  $('pauseBtn').disabled=false; $('abortBtn').disabled=false; $('pauseBtn').textContent='Pause';
+  log(`PLC accepted setpoints: ${fmt(S.plan.o.P)} kW, ramp ${S.plan.o.ramp} kW/min`,'o');
+  S.lastFrame=performance.now(); requestAnimationFrame(tick);
+}
+function stopRun(){ if(S.state==='running') S.state='stopped'; $('pauseBtn').disabled=true; $('abortBtn').disabled=true; }
+const STAGES=[['ramp','Ramp-up'],['heat','Heating'],['melt','Melting'],['superheat','Superheat'],['approach','Approach'],['hold','Hold'],['tap','Ready to tap']];
+const STAGE_NAME=Object.fromEntries(STAGES);
+function renderStages(cur){
+  const idx=STAGES.findIndex(s=>s[0]===cur);
+  $('stages').innerHTML=STAGES.map((s,i)=>`<div class="stage ${i<idx||(cur==='tap'&&i===idx)?'done':''} ${i===idx&&cur!=='tap'?'now':''}">${s[1]}</div>`).join('');
+}
+function tick(now){
+  if(S.state!=='running') return;
+  const dtReal=Math.min(0.1,(now-S.lastFrame)/1000); S.lastFrame=now;
+  if(!S.paused){
+    let simDt=dtReal*S.speed;
+    while(simDt>0 && !S.sim.done){ const d=Math.min(10,simDt); S.sim.step(d); simDt-=d; }
+    const s=S.sim, tm=s.t/60;
+    const last=S.samples[S.samples.length-1];
+    if(tm-last[0]>=0.25 || s.done) S.samples.push([tm, s.T + gauss(S.noise)*1.6, s.P]);
+    if(!S.stagesSeen.has(s.phase)){ S.stagesSeen.add(s.phase);
+      const msg={heat:'Coil at setpoint; solid charge heating',melt:`Liquidus reached (${S.inputs.g.Tm} °C); melting`,superheat:'Charge fully molten; superheating',approach:`Stage transition at ${fmt(S.plan.o.stageT)} °C: power reduced to ${fmt(S.plan.o.P*S.plan.o.stageFrac)} kW`,hold:`Target ${fmt(S.inputs.Tt)} °C reached; holding for chemistry check`,tap:'Hold complete. Ready to tap.'}[s.phase];
+      if(msg) log(msg, s.phase==='tap'?'o':'h');
+    }
+    if(tm>=S.nextReplan && !s.done){ S.nextReplan+=5; replan(); }
+    updateLive();
+    if(s.done){ finishRun(); }
+  }
+  drawTrend();
+  if(S.state==='running') requestAnimationFrame(tick);
+}
+function predictRemaining(){
+  // receding-horizon forecast from the current measured state, using the learned model
+  const s=S.sim, o=S.plan.o, f=makeSim({...o,...LEARNED,T0:s.T});
+  f.H=s.H; f.P=s.P; f.t=s.t; f.phase=s.phase==='hold'?'hold':s.phase; f.hold=s.hold; f.E=s.E;
+  while(!f.done) f.step(20);
+  return {tLeft:(f.t-s.t)/60, E:f.E};
+}
+function replan(){
+  const s=S.sim, tm=s.t/60;
+  const pred=S.plan.r.samples, j=pred.findIndex(p=>p[0]>=tm);
+  let pT=S.inputs.Tt; if(j>0){ const a=pred[j-1], b=pred[j], f=(tm-a[0])/((b[0]-a[0])||1); pT=a[1]+(b[1]-a[1])*f; } else if(j===0) pT=pred[0][1];
+  const dev=s.T-pT;
+  log(`MPC re-check: ${dev>=0?'+':''}${fmt(dev,1)} °C vs trajectory, ${Math.abs(dev)<15?'on track':'compensating'}`, Math.abs(dev)<15?'i':'w');
+}
+function updateLive(){
+  const s=S.sim, I=S.inputs, last=S.samples[S.samples.length-1];
+  $('kTemp').innerHTML=`${fmt(last[1])}<small>°C</small>`;
+  $('kPow').innerHTML=`${fmt(s.P)}<small>kW</small>`; $('kPowSub').textContent=`${fmt(100*s.P/FURNACE.Prated)}% of 750 kW rated`;
+  $('kEn').innerHTML=`${fmt(s.E)}<small>kWh</small>`;
+  const f=predictRemaining();
+  $('kTime').innerHTML=`${fmt(s.done?0:f.tLeft)}<small>min</small>`; $('kTimeSub').textContent=`Elapsed ${clock(s.t/60)} · forecast ${fmt(f.E)} kWh`;
+  $('kSpec').innerHTML=`${fmt(s.E/I.m*1000)}<small>kWh/t</small>`;
+  $('kStage').textContent=STAGE_NAME[s.phase]||s.phase;
+  const mf=meltFrac(I.g,s.H);
+  $('kStageSub').textContent= mf>0&&mf<1 ? `${fmt(mf*100)}% molten` : (s.phase==='hold'?`Hold ${clock(s.hold/60)} of ${S.plan.o.holdMin}:00`: (mf>=1?'Fully molten':'Solid charge'));
+  renderStages(s.phase);
+}
+function finishRun(){
+  S.state='done'; $('pauseBtn').disabled=true; $('abortBtn').disabled=true;
+  const s=S.sim, b=S.base;
+  setApproval('done',`Used ${fmt(s.E)} kWh in ${fmt(s.t/60)} min. Manual practice would need ${fmt(b.E)} kWh in ${fmt(b.t)} min.`);
+  setMode('done'); log(`Heat complete: ${fmt(s.E)} kWh, ${fmt(s.t/60)} min (${fmt(100*(1-s.E/b.E),1)}% less energy, ${fmt(100*(1-s.t/60/b.t),1)}% faster than baseline)`,'o');
+  updateLive(); drawBars();
+}
+
+/* ===================== Mode / loop diagram ===================== */
+const LOOP_NODES=[
+  {id:'in',  x:20, y:20, w:170,h:54, t:'Operator inputs', s:'Grade, weight, temps'},
+  {id:'hmi', x:240,y:20, w:150,h:54, t:'HMI', s:'This dashboard'},
+  {id:'ai',  x:440,y:20, w:200,h:54, t:'Physics + AI model', s:'Prediction & MPC'},
+  {id:'ap',  x:440,y:124,w:200,h:54, t:'Operator approval', s:'Approve / reject'},
+  {id:'plc', x:440,y:228,w:200,h:54, t:'PLC safety checks', s:'Interlocks, actuation'},
+  {id:'fur', x:220,y:228,w:170,h:54, t:'Induction furnace', s:'Coil + crucible'},
+  {id:'fb',  x:20, y:228,w:150,h:54, t:'Sensor feedback', s:'Temp, power, energy'}
+];
+const LOOP_EDGES=[['in','hmi','M190 47H232'],['hmi','ai','M390 47H432'],['ai','ap','M540 74V116'],['ap','plc','M540 178V220'],['plc','fur','M440 255H398'],['fur','fb','M220 255H178'],['fb','ai','M95 228V100H610V82']];
+function drawLoop(active){
+  const on=new Set(active);
+  let h=`<svg viewBox="0 0 660 300" aria-label="Closed-loop control diagram">`;
+  h+=`<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>`;
+  for(const [a,b,d] of LOOP_EDGES) h+=`<path d="${d}" class="edge ${on.has(a)&&on.has(b)?'on':''}" marker-end="url(#ah)"/>`;
+  for(const n of LOOP_NODES) h+=`<g class="node ${on.has(n.id)?'on':''}"><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8"/><text x="${n.x+12}" y="${n.y+23}">${n.t}</text><text class="s" x="${n.x+12}" y="${n.y+42}">${n.s}</text></g>`;
+  $('loop').innerHTML=h+`</svg>`;
+}
+function setMode(m){
+  const M={
+    await:['warn','Awaiting approval',['ap'],'Waiting at operator approval'],
+    checking:['live','PLC checking',['ap','plc'],'Approved; PLC interlocks running'],
+    blocked:['crit','Blocked by PLC',['plc'],'PLC refused the setpoints'],
+    rejected:['crit','Plan rejected',['in','hmi'],'Back to operator input'],
+    running:['live ok','Closed loop active',['ai','ap','plc','fur','fb'],'Heat running under closed-loop control'],
+    done:['ok','Ready to tap',['fur'],'Heat complete, ready to tap'],
+    stop:['crit','Emergency stop',['plc'],'Coil de-energised by E-stop']
+  }[m];
+  const d=$('modeDot'); d.className='dot '+(M[0].includes('crit')?'crit':M[0].includes('warn')?'warn':'')+(M[0].includes('live')?' live':'');
+  $('modeTxt').textContent=M[1]; $('loopTxt').textContent=M[3]; drawLoop(M[2]);
+  $('plcDot').className='dot '+(m==='blocked'||m==='stop'?'crit':''); $('plcTxt').textContent=m==='blocked'?'PLC interlock tripped':m==='stop'?'PLC: E-stop':'PLC link OK';
+}
+
+/* ===================== Trend chart ===================== */
+function niceMax(v,step){ return Math.ceil(v/step)*step; }
+function drawTrend(){
+  if(!S.plan) return;
+  const W=820,H=360,ml=52,mr=56,mt=14,mb=36, pw=W-ml-mr, ph=H-mt-mb;
+  const pred=S.plan.r.samples, base=S.base.samples, I=S.inputs;
+  const tMax=niceMax(Math.max(S.base.t,S.plan.r.t,S.sim?S.sim.t/60:0)+2,10);
+  const yMax=niceMax(Math.max(I.Tt+60,I.g.max),200), yMin=0;
+  const x=t=>ml+pw*t/tMax, y=T=>mt+ph*(1-(T-yMin)/(yMax-yMin)), yp=P=>mt+ph*(1-P/FURNACE.Prated);
+  let g=`<svg viewBox="0 0 ${W} ${H}">`;
+  // grid
+  for(let T=0;T<=yMax;T+=200){ g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(T)}" y2="${y(T)}" stroke="var(--line)" stroke-width="1"/><text x="${ml-8}" y="${y(T)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">${T}</text>`; }
+  const xs=tMax<=60?10:tMax<=120?20:30;
+  for(let t=0;t<=tMax;t+=xs){ g+=`<text x="${x(t)}" y="${H-mb+18}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">${t}</text>`; }
+  for(let P=0;P<=FURNACE.Prated;P+=250){ g+=`<text x="${W-mr+8}" y="${yp(P)+4}" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">${P}</text>`; }
+  g+=`<text x="${ml}" y="${H-4}" font-size="11" fill="var(--muted)">min</text><text x="${ml-8}" y="${mt-2}" text-anchor="end" font-size="11" fill="var(--muted)">°C</text><text x="${W-mr+8}" y="${mt-2}" font-size="11" fill="var(--muted)">kW</text>`;
+  // liquidus band
+  g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(I.g.Tm)}" y2="${y(I.g.Tm)}" stroke="var(--ghost)" stroke-dasharray="2 4"/><text x="${ml+6}" y="${y(I.g.Tm)-5}" font-size="11" fill="var(--muted)">Liquidus ${I.g.Tm} °C</text>`;
+  // power area (actual run, else planned)
+  const pSrc=S.sim?S.samples:pred;
+  if(pSrc.length>1){ let d=`M${x(pSrc[0][0])} ${yp(0)}`; for(const p of pSrc) d+=`L${x(p[0]).toFixed(1)} ${yp(p[2]).toFixed(1)}`; d+=`L${x(pSrc[pSrc.length-1][0])} ${yp(0)}Z`; g+=`<path d="${d}" fill="var(--ghost)" opacity=".22"/>`; }
+  const line=(arr,stroke,w,dash,op)=>{ let d=''; arr.forEach((p,i)=>d+=(i?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1)); return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" ${dash?`stroke-dasharray="${dash}"`:''} opacity="${op||1}" stroke-linejoin="round"/>`; };
+  g+=line(base,'var(--muted)',1.5,'',.55);
+  // target
+  g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(I.Tt)}" y2="${y(I.Tt)}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="7 5"/><text x="${ml+6}" y="${y(I.Tt)-6}" font-size="11.5" fill="var(--warn)" font-weight="600">Target ${fmt(I.Tt)} °C</text>`;
+  g+=line(pred,'var(--setpoint)',2,'6 4');
+  if(S.sim && S.samples.length>1){
+    g+=line(S.samples,'var(--molten)',2.6);
+    const L=S.samples[S.samples.length-1];
+    g+=`<circle cx="${x(L[0])}" cy="${y(L[1])}" r="5" fill="var(--molten)" stroke="var(--panel)" stroke-width="2"/>`;
+    g+=`<text x="${Math.min(x(L[0])+8,W-mr-60)}" y="${y(L[1])+18}" font-size="12" font-family="var(--f-mono)" fill="var(--molten)" font-weight="600">${fmt(L[1])} °C</text>`;
+  } else {
+    g+=`<text x="${ml+pw/2}" y="${mt+ph*0.22}" text-anchor="middle" font-size="13" fill="var(--muted)">Approve the plan to start the heat. Dashed line is the AI forecast.</text>`;
+  }
+  // end markers
+  g+=`<text x="${x(S.base.t)}" y="${y(I.Tt+40)-8}" text-anchor="middle" font-size="11" fill="var(--muted)">baseline tap ${fmt(S.base.t)}′</text>`;
+  g+=`<line x1="${x(S.plan.r.t)}" x2="${x(S.plan.r.t)}" y1="${y(I.Tt)}" y2="${mt+ph}" stroke="var(--setpoint)" stroke-width="1" opacity=".5"/><text x="${x(S.plan.r.t)}" y="${mt+ph-6}" text-anchor="middle" font-size="11" fill="var(--setpoint)">tap ${fmt(S.plan.r.t)}′</text>`;
+  g+=`<line x1="${ml}" x2="${W-mr}" y1="${mt+ph}" y2="${mt+ph}" stroke="var(--muted)" stroke-width="1"/>`;
+  $('trend').innerHTML=g+`</svg>`;
+}
+
+/* ===================== Bars ===================== */
+function drawBars(){
+  if(!S.plan) return;
+  let data, note;
+  if(S.barMode==='proto'){
+    data=[['Energy consumption','kWh',700,595,false],['Melting time','min',120,95,false],['Furnace efficiency','%',78,84,true]];
+    note='Prototype results reported in the project deck: 15% less energy, 21% shorter melt, efficiency up 6 points.';
+  } else {
+    const I=S.inputs, opt=S.sim&&S.sim.done?{E:S.sim.E,t:S.sim.t/60}:{E:S.actualPreview.E,t:S.actualPreview.t};
+    const theo=I.m*(Hof(I.g,I.Tt)-Hof(I.g,I.T0))/3.6e6;
+    data=[['Energy consumption','kWh',S.base.E,opt.E,false],['Time to tap','min',S.base.t,opt.t,false],['Thermal efficiency','%',100*theo/S.base.E,100*theo/opt.E,true]];
+    note=`${fmt(I.m)} kg ${I.g.name}, ${fmt(I.T0)} → ${fmt(I.Tt)} °C. Baseline is manual practice: 50% power for 15 min, full power, ~40 °C overshoot margin, 18 min hold. ${S.sim&&S.sim.done?'Optimized values are from the completed run.':'Optimized values are the simulated outcome of the recommended plan.'}`;
+  }
+  const W=600,H=250, gw=W/3;
+  let g=`<svg viewBox="0 0 ${W} ${H}">`;
+  data.forEach((d,i)=>{
+    const [name,u,a,b,up]=d, mx=Math.max(a,b)*1.18, bx=i*gw+gw/2, top=34, base=H-44, hh=base-top;
+    const ha=hh*a/mx, hb=hh*b/mx, bw=Math.min(52,gw/3.4);
+    const ch=up?(b-a):(100*(b-a)/a), good=up?b>a:b<a;
+    g+=`<rect x="${bx-bw-4}" y="${base-ha}" width="${bw}" height="${ha}" rx="3" fill="var(--ghost)" opacity=".7"/>`;
+    g+=`<rect x="${bx+4}" y="${base-hb}" width="${bw}" height="${hb}" rx="3" fill="var(--molten)"/>`;
+    g+=`<text x="${bx-bw/2-4}" y="${base-ha-6}" text-anchor="middle" font-size="12" font-family="var(--f-mono)" fill="var(--muted)">${fmt(a)}</text>`;
+    g+=`<text x="${bx+bw/2+4}" y="${base-hb-6}" text-anchor="middle" font-size="12" font-family="var(--f-mono)" fill="var(--fg)" font-weight="600">${fmt(b)}</text>`;
+    g+=`<text x="${bx}" y="16" text-anchor="middle" font-size="13" font-weight="700" font-family="var(--f-mono)" fill="${good?'var(--ok)':'var(--crit)'}">${ch>0?'▲':'▼'} ${fmt(Math.abs(ch),up?1:0)}${up?' pts':'%'}</text>`;
+    g+=`<line x1="${bx-gw/2+14}" x2="${bx+gw/2-14}" y1="${base}" y2="${base}" stroke="var(--line)"/>`;
+    g+=`<text x="${bx}" y="${base+18}" text-anchor="middle" font-size="12.5" fill="var(--fg)">${name}</text><text x="${bx}" y="${base+34}" text-anchor="middle" font-size="11" fill="var(--muted)">(${u})</text>`;
+  });
+  g+=`</svg>`;
+  $('bars').innerHTML=`<div class="legend" style="margin-bottom:6px"><span><i style="background:var(--ghost);height:9px"></i>Without optimizer</span><span><i style="background:var(--molten);height:9px"></i>With optimizer</span></div>`+g;
+  $('barNote').textContent=note;
+}
+
+/* ===================== Scatter ===================== */
+function drawScatter(){
+  const W=560,H=320,ml=48,mr=14,mt=12,mb=34,pw=W-ml-mr,ph=H-mt-mb;
+  const all=HIST.flatMap(h=>[h.phys,h.ai,h.actual]); const lo=Math.floor(Math.min(...all)/100)*100, hi=Math.ceil(Math.max(...all)/100)*100;
+  const x=v=>ml+pw*(v-lo)/(hi-lo), y=v=>mt+ph*(1-(v-lo)/(hi-lo));
+  let g=`<svg viewBox="0 0 ${W} ${H}">`;
+  const step=(hi-lo)>800?200:100;
+  for(let v=lo;v<=hi;v+=step){ g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end" font-size="10.5" fill="var(--muted)" font-family="var(--f-mono)">${v}</text><text x="${x(v)}" y="${H-mb+16}" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="var(--f-mono)">${v}</text>`; }
+  g+=`<line x1="${x(lo)}" y1="${y(lo)}" x2="${x(hi)}" y2="${y(hi)}" stroke="var(--muted)" stroke-dasharray="4 4"/>`;
+  for(const h of HIST) g+=`<circle cx="${x(h.phys).toFixed(1)}" cy="${y(h.actual).toFixed(1)}" r="3.2" fill="var(--ghost)" opacity=".75"/>`;
+  for(const h of HIST) g+=`<circle cx="${x(h.ai).toFixed(1)}" cy="${y(h.actual).toFixed(1)}" r="3.2" fill="var(--molten)" opacity=".85"/>`;
+  g+=`<text x="${ml+pw/2}" y="${H-2}" text-anchor="middle" font-size="11" fill="var(--muted)">Predicted energy (kWh)</text>`;
+  g+=`<text transform="translate(12 ${mt+ph/2}) rotate(-90)" text-anchor="middle" font-size="11" fill="var(--muted)">Metered energy (kWh)</text>`;
+  g+=`<text x="${x(hi)-6}" y="${y(hi)+16}" text-anchor="end" font-size="11" fill="var(--muted)">perfect prediction</text>`;
+  $('scatter').innerHTML=`<div class="legend" style="margin-bottom:6px"><span><i style="background:var(--ghost);height:8px;width:8px;border-radius:50%"></i>Physics only</span><span><i style="background:var(--molten);height:8px;width:8px;border-radius:50%"></i>Physics + AI</span></div>`+g+`</svg>`;
+  const mape=k=>HIST.reduce((a,h)=>a+Math.abs(h[k]-h.actual)/h.actual,0)/HIST.length*100;
+  $('mapePhys').textContent=fmt(mape('phys'),1)+'%'; $('mapeAI').textContent=fmt(mape('ai'),1)+'%'; $('nHeats').textContent=HIST.length;
+}
+
+/* ===================== Impact ===================== */
+function updateImpact(){
+  if(!S.plan) return;
+  const heats=(+$('aHeats').value||0)*(+$('aDays').value||0), tariff=+$('aTariff').value||0, grid=+$('aGrid').value||0;
+  const opt=S.sim&&S.sim.done?{E:S.sim.E,t:S.sim.t/60}:S.actualPreview;
+  const dE=Math.max(0,S.base.E-opt.E)*heats, dT=Math.max(0,S.base.t-opt.t)*heats/60;
+  $('iEn').textContent=dE>=1e6?fmt(dE/1e6,2)+' GWh':fmt(dE/1000,0)+' MWh';
+  const c=dE*tariff; $('iCost').textContent= c>=1e7?'₹'+fmt(c/1e7,2)+' Cr':'₹'+fmt(c/1e5,1)+' L';
+  $('iCO2').textContent=fmt(dE*grid/1000,0)+' t';
+  $('iHrs').textContent=fmt(dT,0)+' h';
+}
+
+/* ===================== Wiring ===================== */
+$('heatForm').addEventListener('submit',e=>{ e.preventDefault(); computePlan(); });
+$('approveBtn').addEventListener('click',approve);
+$('rejectBtn').addEventListener('click',reject);
+$('pauseBtn').addEventListener('click',()=>{ S.paused=!S.paused; $('pauseBtn').textContent=S.paused?'Resume':'Pause'; log(S.paused?'Simulation paused':'Simulation resumed','i'); });
+$('abortBtn').addEventListener('click',()=>{ if(S.state!=='running') return; S.state='stop'; S.sim.P=0; $('pauseBtn').disabled=true; $('abortBtn').disabled=true; setApproval('stop','Coil de-energised. Start a new heat to continue.'); setMode('stop'); log('EMERGENCY STOP: coil de-energised by operator','c'); $('kPow').innerHTML='0<small>kW</small>'; });
+$('resetBtn').addEventListener('click',()=>{ computePlan(); });
+$('speed').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.speed=+b.dataset.s; for(const x of $('speed').children) x.setAttribute('aria-pressed',x===b); });
+$('barTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.barMode=b.dataset.k; for(const x of $('barTabs').children) x.setAttribute('aria-selected',x===b); drawBars(); });
+$('assume').addEventListener('input',updateImpact);
+$('aTariff').addEventListener('change',()=>{ if(S.state==='await') computePlan(true); });
+$('themeBtn').addEventListener('click',()=>{ const r=document.documentElement, cur=r.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'); r.dataset.theme=cur==='light'?'dark':'light'; try{localStorage.setItem('if01-theme',r.dataset.theme);}catch(_){} });
+try{ const t=localStorage.getItem('if01-theme'); if(t) document.documentElement.dataset.theme=t; }catch(_){}
+
+gradeSel.value='gci'; gradeSel.dispatchEvent(new Event('change'));
+drawScatter();
+computePlan(true);
+log('Edge node online; historical model loaded ('+HIST.length+' heats)','i');
+log(`Plan computed for ${fmt(S.inputs.m)} kg ${S.inputs.g.name}: ${fmt(S.plan.o.P)} kW, predicted ${fmt(S.plan.r.E)} kWh / ${fmt(S.plan.r.t)} min`,'i');
+</script>
