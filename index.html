@@ -51,7 +51,9 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-
 .dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.idle{background:var(--ghost)}
 .dot.live{animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.35}}
-.themebtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:pointer}
+.themebtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;width:32px;height:28px;padding:0;display:inline-grid;place-items:center;cursor:pointer;color:var(--fg)}
+.themebtn svg{width:16px;height:16px;display:block}
+.themebtn:hover{color:var(--molten)}
 
 /* KPI strip */
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -216,7 +218,7 @@ footer{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;fo
       <span class="chip"><span class="dot" id="edgeDot"></span>Edge node: Raspberry Pi</span>
       <span class="chip"><span class="dot" id="plcDot"></span><span id="plcTxt">PLC link OK</span></span>
       <span class="chip"><span class="dot idle" id="modeDot"></span><span id="modeTxt">Awaiting approval</span></span>
-      <button class="themebtn" id="themeBtn" type="button" aria-label="Toggle colour theme">Theme</button>
+      <button class="themebtn" id="themeBtn" type="button" aria-label="Switch to light theme" title="Switch theme"></button>
     </div>
   </header>
 
@@ -293,8 +295,8 @@ footer{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;fo
         <div style="display:flex;gap:8px;align-items:center">
           <span class="label">Sim speed</span>
           <div class="speed" id="speed">
-            <button type="button" data-s="60" aria-pressed="false">60×</button>
-            <button type="button" data-s="240" aria-pressed="true">240×</button>
+            <button type="button" data-s="60" aria-pressed="true">60×</button>
+            <button type="button" data-s="240" aria-pressed="false">240×</button>
             <button type="button" data-s="600" aria-pressed="false">600×</button>
           </div>
         </div>
@@ -480,8 +482,8 @@ const HIST=(function(){
 
 /* ===================== State ===================== */
 const $=id=>document.getElementById(id);
-const S={plan:null,base:null,phys:null,state:'await',sim:null,samples:[],speed:240,paused:false,lastFrame:0,
-  checksDone:false,logT:0,nextReplan:5,stagesSeen:new Set(),barMode:'heat',started:false};
+const S={plan:null,base:null,phys:null,state:'await',sim:null,samples:[],paused:false,lastFrame:0,
+  checksDone:false,logT:0,nextReplan:5,stagesSeen:new Set(),barMode:'heat',started:false,speed:60,auto:true,autoTimer:null,demoIdx:0,lastChecks:0};
 const fmt=(v,d=0)=>Number(v).toLocaleString('en-IN',{maximumFractionDigits:d,minimumFractionDigits:d});
 const clock=min=>{const m=Math.max(0,Math.floor(min)), s=Math.floor((min-m)*60); return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');};
 
@@ -505,6 +507,7 @@ function readInputs(){
 
 /* ===================== Plan ===================== */
 function computePlan(silent){
+  clearTimeout(S.autoTimer);
   stopRun();
   const I=readInputs(), g=I.g;
   const best=optimise(g,I.m,I.T0,I.Tt,I.tariff);
@@ -546,6 +549,8 @@ function computePlan(silent){
 }
 
 /* ===================== Approval + PLC ===================== */
+const LIVE={flow:212,lining:46.0,noise:rng(7)};
+function jitterLive(){ LIVE.flow=Math.max(196,Math.min(226,LIVE.flow+gauss(LIVE.noise)*1.2+(212-LIVE.flow)*0.05)); }
 function interlocks(){
   const I=S.inputs, o=S.plan.o;
   return [
@@ -553,8 +558,8 @@ function interlocks(){
     ['Ramp ≤ inverter limit', o.ramp<=FURNACE.rampMax, `${o.ramp} / ${FURNACE.rampMax} kW/min`],
     ['Charge ≤ crucible capacity', I.m<=FURNACE.cap, `${fmt(I.m)} / ${fmt(FURNACE.cap)} kg`],
     ['Target ≤ grade limit', I.Tt<=I.g.max, `${fmt(I.Tt)} / ${fmt(I.g.max)} °C`],
-    ['Coil cooling water flow', true, '212 L/min ≥ 180'],
-    ['Refractory lining wear', true, '46% (limit 80%)'],
+    ['Coil cooling water flow', true, `${fmt(LIVE.flow)} L/min ≥ 180`],
+    ['Refractory lining wear', true, `${fmt(LIVE.lining,1)}% (limit 80%)`],
     ['Earth-leakage relay', true, 'Healthy'],
     ['Tilt and lid interlock', true, 'Locked']
   ];
@@ -576,14 +581,14 @@ function approve(){
   const L=interlocks(), st=L.map(()=>''); let i=0;
   (function next(){
     if(i>0) st[i-1]=L[i-1][1]?'pass':'fail';
-    if(i>0 && !L[i-1][1]){ renderChecks(st); S.state='blocked'; setApproval('blocked',`“${L[i-1][0]}” failed. Setpoints were not sent to the coil.`); setMode('blocked'); log(`PLC interlock failed: ${L[i-1][0]} (${L[i-1][2]})`,'c'); return; }
+    if(i>0 && !L[i-1][1]){ renderChecks(st); S.state='blocked'; setApproval('blocked',`“${L[i-1][0]}” failed. Setpoints were not sent to the coil.`); setMode('blocked'); log(`PLC interlock failed: ${L[i-1][0]} (${L[i-1][2]})`,'c'); scheduleNext(10000); return; }
     if(i>=L.length){ renderChecks(st); S.checksDone=true; startRun(); return; }
     st[i]='run'; renderChecks(st); i++; setTimeout(next, 170);
   })();
 }
 function reject(){
   if(S.state!=='await') return;
-  S.state='rejected'; setApproval('bad'); setMode('rejected'); log('Operator rejected the recommendation','w');
+  S.state='rejected'; setApproval('bad'); setMode('rejected'); log('Operator rejected the recommendation','w'); scheduleNext(8000);
 }
 
 /* ===================== Live run ===================== */
@@ -601,22 +606,25 @@ function renderStages(cur){
   const idx=STAGES.findIndex(s=>s[0]===cur);
   $('stages').innerHTML=STAGES.map((s,i)=>`<div class="stage ${i<idx||(cur==='tap'&&i===idx)?'done':''} ${i===idx&&cur!=='tap'?'now':''}">${s[1]}</div>`).join('');
 }
-function tick(now){
-  if(S.state!=='running') return;
-  const dtReal=Math.min(0.1,(now-S.lastFrame)/1000); S.lastFrame=now;
-  if(!S.paused){
-    let simDt=dtReal*S.speed;
-    while(simDt>0 && !S.sim.done){ const d=Math.min(10,simDt); S.sim.step(d); simDt-=d; }
-    const s=S.sim, tm=s.t/60;
-    const last=S.samples[S.samples.length-1];
-    if(tm-last[0]>=0.25 || s.done) S.samples.push([tm, s.T + gauss(S.noise)*1.6, s.P]);
+function advance(simDt){
+  while(simDt>0 && !S.sim.done){
+    const d=Math.min(10,simDt); S.sim.step(d); simDt-=d;
+    const s=S.sim, tm=s.t/60, last=S.samples[S.samples.length-1];
+    if(tm-last[0]>=0.25 || s.done) S.samples.push([tm, s.T + gauss(S.noise)*1.6, s.P*(1+gauss(S.noise)*0.006)]);
     if(!S.stagesSeen.has(s.phase)){ S.stagesSeen.add(s.phase);
       const msg={heat:'Coil at setpoint; solid charge heating',melt:`Liquidus reached (${S.inputs.g.Tm} °C); melting`,superheat:'Charge fully molten; superheating',approach:`Stage transition at ${fmt(S.plan.o.stageT)} °C: power reduced to ${fmt(S.plan.o.P*S.plan.o.stageFrac)} kW`,hold:`Target ${fmt(S.inputs.Tt)} °C reached; holding for chemistry check`,tap:'Hold complete. Ready to tap.'}[s.phase];
       if(msg) log(msg, s.phase==='tap'?'o':'h');
     }
     if(tm>=S.nextReplan && !s.done){ S.nextReplan+=5; replan(); }
+  }
+}
+function tick(now){
+  if(S.state!=='running') return;
+  const dtReal=Math.min(0.1,(now-S.lastFrame)/1000); S.lastFrame=now;
+  if(!S.paused){
+    advance(dtReal*S.speed);
     updateLive();
-    if(s.done){ finishRun(); }
+    if(S.sim.done){ finishRun(); }
   }
   drawTrend();
   if(S.state==='running') requestAnimationFrame(tick);
@@ -638,7 +646,8 @@ function replan(){
 function updateLive(){
   const s=S.sim, I=S.inputs, last=S.samples[S.samples.length-1];
   $('kTemp').innerHTML=`${fmt(last[1])}<small>°C</small>`;
-  $('kPow').innerHTML=`${fmt(s.P)}<small>kW</small>`; $('kPowSub').textContent=`${fmt(100*s.P/FURNACE.Prated)}% of 750 kW rated`;
+  const pw=last[2]; $('kPow').innerHTML=`${fmt(pw)}<small>kW</small>`; $('kPowSub').textContent=`${fmt(100*pw/FURNACE.Prated)}% of 750 kW rated`;
+  const nowR=performance.now(); if(nowR-S.lastChecks>1500){ S.lastChecks=nowR; jitterLive(); LIVE.lining+=0.002; if(S.state==='running') renderChecks(interlocks().map(()=>'pass')); }
   $('kEn').innerHTML=`${fmt(s.E)}<small>kWh</small>`;
   const f=predictRemaining();
   $('kTime').innerHTML=`${fmt(s.done?0:f.tLeft)}<small>min</small>`; $('kTimeSub').textContent=`Elapsed ${clock(s.t/60)} · forecast ${fmt(f.E)} kWh`;
@@ -654,6 +663,9 @@ function finishRun(){
   setApproval('done',`Used ${fmt(s.E)} kWh in ${fmt(s.t/60)} min. Manual practice would need ${fmt(b.E)} kWh in ${fmt(b.t)} min.`);
   setMode('done'); log(`Heat complete: ${fmt(s.E)} kWh, ${fmt(s.t/60)} min (${fmt(100*(1-s.E/b.E),1)}% less energy, ${fmt(100*(1-s.t/60/b.t),1)}% faster than baseline)`,'o');
   updateLive(); drawBars();
+  HIST.push({phys:simulate({...S.plan.o,...NOMINAL},300).E, ai:S.plan.r.E, actual:s.E}); drawScatter();
+  log(`Heat added to training set (${HIST.length} heats); AI model updated`,'i');
+  updateImpact(); scheduleNext(9000);
 }
 
 /* ===================== Mode / loop diagram ===================== */
@@ -707,7 +719,7 @@ function drawTrend(){
   for(let P=0;P<=FURNACE.Prated;P+=250){ g+=`<text x="${W-mr+8}" y="${yp(P)+4}" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">${P}</text>`; }
   g+=`<text x="${ml}" y="${H-4}" font-size="11" fill="var(--muted)">min</text><text x="${ml-8}" y="${mt-2}" text-anchor="end" font-size="11" fill="var(--muted)">°C</text><text x="${W-mr+8}" y="${mt-2}" font-size="11" fill="var(--muted)">kW</text>`;
   // liquidus band
-  g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(I.g.Tm)}" y2="${y(I.g.Tm)}" stroke="var(--ghost)" stroke-dasharray="2 4"/><text x="${ml+6}" y="${y(I.g.Tm)-5}" font-size="11" fill="var(--muted)">Liquidus ${I.g.Tm} °C</text>`;
+  g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(I.g.Tm)}" y2="${y(I.g.Tm)}" stroke="var(--ghost)" stroke-dasharray="2 4"/><text x="${ml+pw*0.42}" y="${y(I.g.Tm)+14}" font-size="11" fill="var(--muted)">Liquidus ${I.g.Tm} °C</text>`;
   // power area (actual run, else planned)
   const pSrc=S.sim?S.samples:pred;
   if(pSrc.length>1){ let d=`M${x(pSrc[0][0])} ${yp(0)}`; for(const p of pSrc) d+=`L${x(p[0]).toFixed(1)} ${yp(p[2]).toFixed(1)}`; d+=`L${x(pSrc[pSrc.length-1][0])} ${yp(0)}Z`; g+=`<path d="${d}" fill="var(--ghost)" opacity=".22"/>`; }
@@ -796,22 +808,50 @@ function updateImpact(){
 
 /* ===================== Wiring ===================== */
 $('heatForm').addEventListener('submit',e=>{ e.preventDefault(); computePlan(); });
+['grade','mass','t0','tt'].forEach(id=>$(id).addEventListener('input',()=>{ if(S.state==='await') clearTimeout(S.autoTimer); }));
 $('approveBtn').addEventListener('click',approve);
 $('rejectBtn').addEventListener('click',reject);
 $('pauseBtn').addEventListener('click',()=>{ S.paused=!S.paused; $('pauseBtn').textContent=S.paused?'Resume':'Pause'; log(S.paused?'Simulation paused':'Simulation resumed','i'); });
-$('abortBtn').addEventListener('click',()=>{ if(S.state!=='running') return; S.state='stop'; S.sim.P=0; $('pauseBtn').disabled=true; $('abortBtn').disabled=true; setApproval('stop','Coil de-energised. Start a new heat to continue.'); setMode('stop'); log('EMERGENCY STOP: coil de-energised by operator','c'); $('kPow').innerHTML='0<small>kW</small>'; });
-$('resetBtn').addEventListener('click',()=>{ computePlan(); });
+$('abortBtn').addEventListener('click',()=>{ if(S.state!=='running') return; S.state='stop'; S.sim.P=0; $('pauseBtn').disabled=true; $('abortBtn').disabled=true; setApproval('stop','Coil de-energised. Start a new heat to continue.'); setMode('stop'); log('EMERGENCY STOP: coil de-energised by operator','c'); $('kPow').innerHTML='0<small>kW</small>'; scheduleNext(12000); });
+$('resetBtn').addEventListener('click',()=>{ nextDemoHeat(); });
 $('speed').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.speed=+b.dataset.s; for(const x of $('speed').children) x.setAttribute('aria-pressed',x===b); });
 $('barTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; S.barMode=b.dataset.k; for(const x of $('barTabs').children) x.setAttribute('aria-selected',x===b); drawBars(); });
 $('assume').addEventListener('input',updateImpact);
 $('aTariff').addEventListener('change',()=>{ if(S.state==='await') computePlan(true); });
-$('themeBtn').addEventListener('click',()=>{ const r=document.documentElement, cur=r.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'); r.dataset.theme=cur==='light'?'dark':'light'; try{localStorage.setItem('if01-theme',r.dataset.theme);}catch(_){} });
+const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></svg>';
+const curTheme=()=>document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+function paintThemeBtn(){ const dark=curTheme()==='dark', b=$('themeBtn'); b.innerHTML=dark?SUN:MOON; b.setAttribute('aria-label',dark?'Switch to light theme':'Switch to dark theme'); }
+$('themeBtn').addEventListener('click',()=>{ const r=document.documentElement; r.dataset.theme=curTheme()==='light'?'dark':'light'; try{localStorage.setItem('if01-theme',r.dataset.theme);}catch(_){} paintThemeBtn(); });
 try{ const t=localStorage.getItem('if01-theme'); if(t) document.documentElement.dataset.theme=t; }catch(_){}
+try{ matchMedia('(prefers-color-scheme: light)').addEventListener('change',paintThemeBtn); }catch(_){}
+paintThemeBtn();
 
-gradeSel.value='gci'; gradeSel.dispatchEvent(new Event('change'));
-drawScatter();
-computePlan(true);
-log('Edge node online; historical model loaded ('+HIST.length+' heats)','i');
-log(`Plan computed for ${fmt(S.inputs.m)} kg ${S.inputs.g.name}: ${fmt(S.plan.o.P)} kW, predicted ${fmt(S.plan.r.E)} kWh / ${fmt(S.plan.r.t)} min`,'i');
+/* ===================== Realtime mock driver ===================== */
+// Cycles a realistic production schedule: plan → operator approval → PLC → melt → tap → next heat.
+const SCHEDULE=[
+  {g:'gci',m:1200,T0:30},{g:'sgi',m:1050,T0:30},{g:'cs',m:1350,T0:30},{g:'gci',m:1400,T0:180},
+  {g:'al',m:800,T0:30},{g:'ss',m:1100,T0:30},{g:'sgi',m:1250,T0:30},{g:'cu',m:900,T0:30}
+];
+function loadHeat(h){ gradeSel.value=h.g; gradeSel.dispatchEvent(new Event('change')); $('mass').value=h.m; $('t0').value=h.T0; }
+function scheduleNext(ms){ clearTimeout(S.autoTimer); S.autoTimer=setTimeout(nextDemoHeat,ms); }
+function nextDemoHeat(){
+  S.demoIdx=(S.demoIdx+1)%SCHEDULE.length; loadHeat(SCHEDULE[S.demoIdx]);
+  computePlan();
+  S.autoTimer=setTimeout(()=>{ if(S.state==='await') approve(); },4500);
+}
+function bootLive(){
+  S.demoIdx=Math.floor(Math.random()*SCHEDULE.length); loadHeat(SCHEDULE[S.demoIdx]);
+  drawScatter(); computePlan(true);
+  log('Edge node online; historical model loaded ('+HIST.length+' heats)','i');
+  log(`Plan computed for ${fmt(S.inputs.m)} kg ${S.inputs.g.name}: ${fmt(S.plan.o.P)} kW, predicted ${fmt(S.plan.r.E)} kWh / ${fmt(S.plan.r.t)} min`,'i');
+  log('Operator approved setpoints','o');
+  renderChecks(interlocks().map(()=>'pass')); S.checksDone=true;
+  startRun();
+  // join the heat already in progress
+  advance((0.25+Math.random()*0.45)*S.plan.r.t*60);
+  updateLive(); drawTrend();
+}
+bootLive();
 </script>
 </body></html>
