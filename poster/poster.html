@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Workshop Poster</title>
+<style>
+  :root{
+    --beige:#F4ECDD; --beige-2:#EADFCB; --cream:#FBF7EF;
+    --ink:#1F2A24; --muted:#5A5F55;
+    --green:#2F7A45; --green-d:#1E5631; --green-l:#DCE8D2;
+    --gold:#C9973E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1200px;height:1500px;background:var(--beige)}
+  body{font-family:"Inter",sans-serif;color:var(--ink);position:relative;overflow:hidden}
+  .disp{font-family:"Inter Display","Inter",sans-serif}
+
+  /* background decoration */
+  .blob{position:absolute;border-radius:50%;filter:blur(2px)}
+  .b1{width:620px;height:620px;right:-220px;top:-240px;background:radial-gradient(circle at 40% 60%,#D9E6CC 0%,#E6E3C9 55%,transparent 72%)}
+  .b2{width:520px;height:520px;left:-240px;bottom:-200px;background:radial-gradient(circle,#E3D3B4 0%,transparent 70%)}
+  .grain{position:absolute;inset:0;opacity:.35;
+    background-image:radial-gradient(#d8ccb4 1px,transparent 1px);background-size:22px 22px;
+    mask-image:linear-gradient(180deg,#000 0%,transparent 40%,transparent 70%,#000 100%)}
+  .frame{position:absolute;inset:28px;border:1.5px solid rgba(47,122,69,.18);border-radius:28px;pointer-events:none}
+
+  .wrap{position:relative;padding:80px 84px 0}
+
+  .tagrow{display:flex;gap:12px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:10px;padding:11px 22px;border-radius:999px;
+    font-weight:700;font-size:17px;letter-spacing:.14em;text-transform:uppercase}
+  .pill.solid{background:var(--green-d);color:#F4ECDD}
+  .pill.ghost{border:1.5px solid var(--green);color:var(--green-d);letter-spacing:.08em}
+  .dot{width:9px;height:9px;border-radius:50%;background:#7FD18E;box-shadow:0 0 0 4px rgba(127,209,142,.25)}
+
+  h1{margin-top:36px;font-size:76px;line-height:1.04;font-weight:800;letter-spacing:-.028em;position:relative;z-index:1}
+  h1 .hl{color:var(--green);position:relative;white-space:nowrap}
+  h1 .hl::after{content:"";position:absolute;left:0;right:0;bottom:6px;height:14px;background:rgba(201,151,62,.28);z-index:-1;border-radius:4px}
+  .rule{width:120px;height:6px;border-radius:6px;margin:34px 0 28px;background:linear-gradient(90deg,var(--green-d),var(--gold))}
+  .lede{font-size:23px;line-height:1.55;color:var(--muted);width:440px}
+  .lede b{color:var(--ink);font-weight:600}
+
+  /* laptop */
+  .device{position:absolute;right:70px;top:470px;width:560px}
+  .screen{background:#1d1f22;border-radius:22px 22px 6px 6px;padding:16px;box-shadow:0 30px 60px -20px rgba(60,45,20,.45)}
+  .ui{background:linear-gradient(180deg,#F8FBF6,#EEF5EA);border-radius:10px;height:330px;padding:20px 20px}
+  .ui-top{display:flex;justify-content:space-between;align-items:center}
+  .ui-title{font-weight:700;font-size:19px;display:flex;align-items:center;gap:9px}
+  .ui-title i{width:22px;height:22px;border-radius:6px;background:var(--green);display:inline-block}
+  .live{font-size:13px;font-weight:600;color:var(--green-d);background:var(--green-l);padding:5px 11px;border-radius:999px;display:flex;align-items:center;gap:6px}
+  .live s{width:7px;height:7px;border-radius:50%;background:var(--green);text-decoration:none;display:inline-block}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .stat{background:#fff;border-radius:10px;padding:11px 12px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .stat small{display:block;font-size:11px;color:#7a7f78;font-weight:500}
+  .stat strong{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .stat strong em{font-style:normal;font-size:12px;color:#7a7f78;font-weight:600;margin-left:2px}
+  .stat .on{color:var(--green)}
+  .chart{margin-top:12px;background:#fff;border-radius:10px;padding:10px 12px 6px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .chart small{font-size:11px;color:#7a7f78;font-weight:600}
+  .base{height:20px;background:linear-gradient(180deg,#d9dadc,#a9abaf);border-radius:0 0 18px 18px;margin:0 -34px;position:relative}
+  .base::before{content:"";position:absolute;left:50%;top:0;transform:translateX(-50%);width:110px;height:8px;background:#9a9ca0;border-radius:0 0 8px 8px}
+  .shadow{height:24px;margin:0 -10px;background:radial-gradient(ellipse at center,rgba(70,50,20,.25),transparent 70%)}
+  .hw{position:absolute;left:330px;top:700px;width:250px;z-index:2}
+
+  /* bottom */
+  .bottom{position:absolute;left:84px;right:84px;top:920px;display:grid;grid-template-columns:1.55fr 1fr;gap:28px}
+  .card{min-height:390px;display:flex;flex-direction:column;background:var(--cream);border-radius:26px;padding:36px 38px;box-shadow:0 18px 40px -24px rgba(90,70,30,.35);border:1px solid rgba(201,151,62,.18)}
+  .card h3{font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:var(--green-d);font-weight:800;margin-bottom:24px;display:flex;align-items:center;gap:12px}
+  .card h3::after{content:"";flex:1;height:1.5px;background:linear-gradient(90deg,rgba(47,122,69,.35),transparent)}
+  .items{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:30px 24px;align-content:space-evenly}
+  .item{display:flex;gap:14px;align-items:flex-start}
+  .ic{flex:none;width:50px;height:50px;border-radius:14px;background:var(--green-l);display:grid;place-items:center;color:var(--green-d)}
+  .item b{display:block;font-size:12px;color:var(--gold);letter-spacing:.12em;font-weight:800;margin-bottom:3px}
+  .item p{font-size:18px;line-height:1.3;font-weight:600}
+
+  .rp{display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(160deg,var(--green-d),#2B6B40);color:#F4ECDD;border:none}
+  .rp h3{color:#CFE3C4}
+  .rp h3::after{background:linear-gradient(90deg,rgba(244,236,221,.35),transparent)}
+  .avatar{width:96px;height:96px;border-radius:50%;background:var(--beige);color:var(--green-d);display:grid;place-items:center;font-size:36px;font-weight:800;border:4px solid rgba(244,236,221,.35);box-shadow:0 0 0 8px rgba(244,236,221,.08)}
+  .rp .name{font-size:48px;font-weight:800;letter-spacing:-.02em;margin-top:22px}
+  .rp .role{font-size:17px;color:#CFE3C4;margin-top:6px}
+
+  .stack{position:absolute;left:84px;right:84px;bottom:66px;display:flex;align-items:center;justify-content:space-between}
+  .stack span.l{font-size:14px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .chips{display:flex;gap:10px}
+  .chip{padding:10px 18px;border-radius:999px;background:var(--beige-2);font-size:16px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .chip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+</style>
+</head>
+<body>
+  <div class="blob b1"></div><div class="blob b2"></div><div class="grain"></div><div class="frame"></div>
+
+  <div class="wrap">
+    <div class="tagrow">
+      <span class="pill solid"><span class="dot"></span>Workshop Session</span>
+      <span class="pill ghost">Hands-on</span>
+    </div>
+
+    <h1 class="disp">Building a Firebase<br>Integrated Website with<br><span class="hl">Real-Time IoT Data</span></h1>
+    <div class="rule"></div>
+    <p class="lede">A hands-on session on developing <b>web dashboards using Antigravity</b> and integrating <b>real-time sensor data</b> with Firebase.</p>
+  </div>
+
+  <!-- Laptop mockup -->
+  <div class="device">
+    <div class="screen">
+      <div class="ui">
+        <div class="ui-top">
+          <div class="ui-title"><i></i>IoT Dashboard</div>
+          <div class="live"><s></s>Live</div>
+        </div>
+        <div class="stats">
+          <div class="stat"><small>🌡 Temperature</small><strong>29.8<em>°C</em></strong></div>
+          <div class="stat"><small>💧 Humidity</small><strong>67.4<em>%</em></strong></div>
+          <div class="stat"><small>📶 Device Status</small><strong class="on">Online</strong></div>
+        </div>
+        <div class="chart">
+          <small>Sensor readings · last 60 min</small>
+          <svg viewBox="0 0 480 120" width="100%" height="120">
+            <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F7A45" stop-opacity=".28"/><stop offset="1" stop-color="#2F7A45" stop-opacity="0"/></linearGradient></defs>
+            <g stroke="#E6ECE2" stroke-width="1"><line x1="0" y1="30" x2="480" y2="30"/><line x1="0" y1="65" x2="480" y2="65"/><line x1="0" y1="100" x2="480" y2="100"/></g>
+            <path d="M0,80 C40,40 70,30 100,55 S160,100 200,78 S260,40 300,62 S360,92 400,60 S450,22 480,30 L480,120 L0,120Z" fill="url(#g)"/>
+            <path d="M0,80 C40,40 70,30 100,55 S160,100 200,78 S260,40 300,62 S360,92 400,60 S450,22 480,30" fill="none" stroke="#2F7A45" stroke-width="3" stroke-linecap="round"/>
+            <path d="M0,95 C50,88 90,92 140,84 S230,96 280,88 S380,80 480,72" fill="none" stroke="#C9973E" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/>
+            <circle cx="480" cy="30" r="5" fill="#2F7A45"/><circle cx="480" cy="30" r="10" fill="#2F7A45" opacity=".2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="base"></div>
+    <div class="shadow"></div>
+  </div>
+
+  <!-- ESP board + DHT sensor illustration -->
+  <svg class="hw" viewBox="0 0 260 170">
+    <ellipse cx="130" cy="150" rx="115" ry="12" fill="rgba(70,50,20,.18)"/>
+    <g transform="rotate(-8 90 90)">
+      <rect x="20" y="50" width="130" height="90" rx="8" fill="#1F2422"/>
+      <rect x="20" y="50" width="130" height="90" rx="8" fill="none" stroke="#3a403c"/>
+      <rect x="48" y="66" width="60" height="50" rx="4" fill="#B8BCC0"/>
+      <rect x="54" y="72" width="48" height="38" rx="2" fill="#9EA3A8"/>
+      <g fill="#C9973E">
+        <circle cx="30" cy="60" r="3"/><circle cx="30" cy="72" r="3"/><circle cx="30" cy="84" r="3"/><circle cx="30" cy="96" r="3"/><circle cx="30" cy="108" r="3"/><circle cx="30" cy="120" r="3"/><circle cx="30" cy="132" r="3"/>
+        <circle cx="140" cy="60" r="3"/><circle cx="140" cy="72" r="3"/><circle cx="140" cy="84" r="3"/><circle cx="140" cy="96" r="3"/><circle cx="140" cy="108" r="3"/><circle cx="140" cy="120" r="3"/><circle cx="140" cy="132" r="3"/>
+      </g>
+      <rect x="62" y="124" width="22" height="9" rx="2" fill="#E9E9E9"/>
+      <circle cx="118" cy="128" r="3" fill="#7FD18E"/>
+    </g>
+    <path d="M150,70 C180,55 190,60 200,72" stroke="#D64534" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M150,78 C180,66 192,70 202,82" stroke="#E8B32E" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M150,86 C180,78 194,82 204,92" stroke="#2A2A2A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <g transform="rotate(10 222 100)">
+      <rect x="196" y="66" width="52" height="66" rx="6" fill="#F7F7F5" stroke="#d9d6cf"/>
+      <g fill="#cfccc4">
+        <rect x="204" y="76" width="8" height="6" rx="1"/><rect x="218" y="76" width="8" height="6" rx="1"/><rect x="232" y="76" width="8" height="6" rx="1"/>
+        <rect x="204" y="88" width="8" height="6" rx="1"/><rect x="218" y="88" width="8" height="6" rx="1"/><rect x="232" y="88" width="8" height="6" rx="1"/>
+        <rect x="204" y="100" width="8" height="6" rx="1"/><rect x="218" y="100" width="8" height="6" rx="1"/><rect x="232" y="100" width="8" height="6" rx="1"/>
+        <rect x="204" y="112" width="8" height="6" rx="1"/><rect x="218" y="112" width="8" height="6" rx="1"/><rect x="232" y="112" width="8" height="6" rx="1"/>
+      </g>
+    </g>
+  </svg>
+
+  <div class="bottom">
+    <div class="card">
+      <h3>Session Highlights</h3>
+      <div class="items">
+        <div class="item">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 12l3-3 2 2 4-4"/></svg></div>
+          <div><b>01</b><p>Build a web dashboard using Antigravity</p></div>
+        </div>
+        <div class="item">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+          <div><b>02</b><p>Integrate Firebase Realtime Database</p></div>
+        </div>
+        <div class="item">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></div>
+          <div><b>03</b><p>Connect IoT sensor data</p></div>
+        </div>
+        <div class="item">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+          <div><b>04</b><p>Visualize live data in real time</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card rp">
+      <h3>Resource Person</h3>
+      <div>
+        <div class="avatar">SM</div>
+        <div class="name disp">Sathya M</div>
+        <div class="role">Workshop Facilitator</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <span class="l">Tech Stack</span>
+    <div class="chips">
+      <span class="chip"><i style="background:#2F7A45"></i>Antigravity</span>
+      <span class="chip"><i style="background:#E8A317"></i>Firebase</span>
+      <span class="chip"><i style="background:#1F2422"></i>ESP Board</span>
+      <span class="chip"><i style="background:#9AA0A6"></i>DHT Sensor</span>
+    </div>
+  </div>
+</body>
+</html>
