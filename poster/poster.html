@@ -4,92 +4,136 @@
 <meta charset="utf-8">
 <title>Workshop Poster</title>
 <style>
-  :root{--beige:#F3EADB;--cream:#FAF5EC;--ink:#1F2A24;--muted:#5E625A;--green:#2F7A45;--green-d:#1E5631;--green-l:#DDE8D3}
+  @font-face{font-family:"Outfit";src:url(fonts/outfit.woff2) format("woff2");font-weight:100 900}
+  :root{--cream:#F4EEE1;--line:#E6DDCB;--green:#1E3B2F;--green-2:#2C5241;--orange:#E2694A;--ink:#1E3B2F;--muted:#5D6B63}
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:1200px;height:1500px;background:var(--beige)}
-  body{font-family:"Inter",sans-serif;color:var(--ink);position:relative;overflow:hidden}
-  .disp{font-family:"Inter Display","Inter",sans-serif}
-  .circle{position:absolute;width:560px;height:560px;border-radius:50%;right:-200px;top:-200px;background:#E4E3C8}
+  html,body{width:1200px;height:1600px}
+  body{font-family:"Outfit",sans-serif;color:var(--ink);position:relative;overflow:hidden;
+    background:
+      linear-gradient(var(--line) 1px,transparent 1px) 0 0/48px 48px,
+      linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/48px 48px,
+      var(--cream)}
+  .abs{position:absolute}
 
-  .pill{position:absolute;left:90px;top:90px;padding:12px 24px;border-radius:999px;background:var(--green-d);color:var(--beige);
-    font-weight:700;font-size:17px;letter-spacing:.14em;text-transform:uppercase}
+  /* header / footer bands */
+  .head{left:0;right:0;top:0;height:130px;background:var(--green)}
+  .head-wave{left:0;top:128px;width:1200px;height:40px}
+  .chip{left:60px;top:38px;border:2px solid #F4EEE1;color:#F4EEE1;border-radius:14px;padding:10px 20px;font-size:22px;font-weight:600;letter-spacing:.02em}
+  .chip b{color:var(--orange);font-weight:700}
+  .head-r{right:60px;top:50px;color:#CFD9D2;font-size:22px;font-weight:500;letter-spacing:.02em}
+  .head-r span{color:var(--orange);margin:0 8px}
 
-  h1{position:absolute;left:90px;top:170px;font-size:76px;line-height:1.06;font-weight:800;letter-spacing:-.028em}
-  h1 span{color:var(--green)}
+  .foot{left:0;right:0;bottom:0;height:150px;background:var(--green);color:#F4EEE1;padding:46px 60px 0;font-size:28px;line-height:1.35}
+  .foot b{font-weight:700}
+  .foot-wave{left:0;bottom:148px;width:1200px;height:40px}
 
-  .rule{position:absolute;left:90px;top:470px;width:90px;height:6px;border-radius:6px;background:var(--green)}
-  .lede{position:absolute;left:90px;top:510px;width:420px;font-size:24px;line-height:1.55;color:var(--muted)}
+  /* title */
+  h1{left:0;right:0;top:185px;text-align:center;font-size:132px;font-weight:700;letter-spacing:-.035em;line-height:1}
+  h1 span{color:var(--orange);font-weight:500;font-size:96px;margin:0 18px;position:relative;top:-8px}
 
-  .device{position:absolute;right:90px;top:480px;width:540px}
-  .screen{background:#1d1f22;border-radius:20px 20px 6px 6px;padding:14px;box-shadow:0 30px 50px -24px rgba(60,45,20,.45)}
-  .ui{background:#F8FAF5;border-radius:9px;height:310px;padding:20px}
-  .ui-top{display:flex;justify-content:space-between;align-items:center}
-  .ui-title{font-weight:700;font-size:19px}
-  .live{font-size:13px;font-weight:600;color:var(--green-d);background:var(--green-l);padding:5px 12px;border-radius:999px}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
-  .stat{background:#fff;border-radius:10px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-  .stat small{display:block;font-size:12px;color:#7a7f78;font-weight:500;margin-bottom:2px}
-  .stat strong{font-size:23px;font-weight:800;letter-spacing:-.02em}
-  .stat em{font-style:normal;font-size:13px;color:#7a7f78;font-weight:600}
-  .stat .on{color:var(--green)}
-  .chart{margin-top:12px;background:#fff;border-radius:10px;padding:12px 12px 4px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-  .base{height:18px;background:linear-gradient(180deg,#d9dadc,#a9abaf);border-radius:0 0 16px 16px;margin:0 -32px;position:relative}
-  .base::before{content:"";position:absolute;left:50%;top:0;transform:translateX(-50%);width:100px;height:7px;background:#9a9ca0;border-radius:0 0 7px 7px}
+  /* big illustration */
+  .art{left:60px;top:420px;width:600px;height:760px}
+  .laptop{left:40px;top:150px;width:520px;transform:rotate(-6deg)}
+  .scr{height:350px;background:var(--orange);border-radius:34px 34px 10px 10px;box-shadow:22px 22px 0 var(--green);position:relative;padding:34px 34px}
+  .scr .live{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#F4EEE1;border-radius:999px;padding:6px 16px;font-size:18px;font-weight:600}
+  .scr .live i{width:10px;height:10px;border-radius:50%;background:#8BE0A0}
+  .vals{display:flex;gap:14px;margin-top:20px}
+  .val{background:#F4EEE1;border-radius:16px;padding:10px 18px;font-size:34px;font-weight:700;color:var(--green)}
+  .val small{font-size:18px;font-weight:500;color:var(--muted);margin-left:2px}
+  .wave{position:absolute;left:30px;right:30px;bottom:26px}
+  .base{height:30px;margin:0 -30px;background:var(--green);border-radius:0 0 30px 30px;transform:translate(22px,22px)}
 
-  .bottom{position:absolute;left:90px;right:90px;top:930px;bottom:90px;background:var(--cream);border-radius:28px;
-    display:grid;grid-template-columns:1.5fr 1px 1fr;align-items:center;padding:0 56px;gap:52px}
-  h3{font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);font-weight:800;margin-bottom:24px}
-  ul{list-style:none;display:grid;gap:18px}
-  li{display:flex;align-items:center;gap:16px;font-size:21px;font-weight:500}
-  li i{flex:none;width:30px;height:30px;border-radius:50%;background:var(--green-l);display:grid;place-items:center}
-  .divider{height:70%;background:#E2D6C2}
-  .name{font-size:54px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
+  .icon{left:10px;top:20px;width:110px;height:110px}
+  .pill{border-radius:999px;padding:14px 26px;font-size:24px;font-weight:600;white-space:nowrap;box-shadow:0 6px 0 rgba(30,59,47,.18)}
+  .pd{background:var(--green);color:#F4EEE1}
+  .pl{background:#FBF7EE;color:var(--green);border:2px solid var(--green)}
+
+  /* right column */
+  .col{left:700px;top:380px;width:440px}
+  .col h2{font-size:62px;white-space:nowrap;font-weight:700;line-height:.98;letter-spacing:-.03em}
+  .row{border-top:2px solid #CFC5B2;padding:20px 0 22px}
+  .row:first-of-type{margin-top:32px}
+  .lab{font-size:20px;color:var(--muted);font-weight:500}
+  .big{font-size:40px;font-weight:700;line-height:1.1;margin-top:4px}
+  .big.or{color:var(--orange)}
+  .sub{font-size:20px;color:var(--muted);margin-top:4px}
+  .topic{font-size:27px;font-weight:600;line-height:1.25;margin-top:6px}
+
+  .rp{left:700px;top:1080px;width:440px;height:230px;background:var(--green);border-radius:28px;color:#F4EEE1;padding:34px 38px;box-shadow:12px 12px 0 var(--orange)}
+  .rp .lab{color:#B9C8BF;font-size:22px}
+  .rp .name{font-size:76px;font-weight:700;letter-spacing:-.025em;margin-top:14px;line-height:1}
+  .rp .bar{width:70px;height:6px;border-radius:6px;background:var(--orange);margin-top:22px}
 </style>
 </head>
 <body>
-  <div class="circle"></div>
-  <div class="pill">Workshop Session</div>
+  <div class="abs head"></div>
+  <svg class="abs head-wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0,0 H1200 V8 C900,40 700,4 420,22 C250,33 110,26 0,14Z" fill="#1E3B2F"/></svg>
+  <div class="abs chip"><b>{</b> Workshop Session <b>}</b></div>
+  <div class="abs head-r">Antigravity<span>•</span>Firebase<span>•</span>IoT</div>
 
-  <h1 class="disp">Building a Firebase<br>Integrated Website with<br><span>Real-Time IoT Data</span></h1>
-  <div class="rule"></div>
-  <p class="lede">A hands-on session on developing web dashboards using Antigravity and integrating real-time sensor data with Firebase.</p>
+  <h1 class="abs">Firebase<span>x</span>IoT</h1>
 
-  <div class="device">
-    <div class="screen">
-      <div class="ui">
-        <div class="ui-top"><div class="ui-title">IoT Dashboard</div><div class="live">● Live</div></div>
-        <div class="stats">
-          <div class="stat"><small>Temperature</small><strong>29.8<em> °C</em></strong></div>
-          <div class="stat"><small>Humidity</small><strong>67.4<em> %</em></strong></div>
-          <div class="stat"><small>Device Status</small><strong class="on">Online</strong></div>
+  <!-- illustration -->
+  <div class="abs art">
+    <svg class="abs icon" viewBox="0 0 110 110">
+      <circle cx="55" cy="58" r="44" fill="#E2694A" stroke="#1E3B2F" stroke-width="6"/>
+      <path d="M33,58 a22,22 0 0 1 44,0" fill="none" stroke="#F4EEE1" stroke-width="6" stroke-linecap="round"/>
+      <path d="M43,58 a12,12 0 0 1 24,0" fill="none" stroke="#F4EEE1" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="55" cy="62" r="5" fill="#F4EEE1"/>
+      <rect x="49" y="2" width="12" height="12" rx="3" fill="#1E3B2F"/>
+    </svg>
+
+    <div class="abs laptop">
+      <div class="scr">
+        <span class="live"><i></i>LIVE</span>
+        <div class="vals">
+          <div class="val">29.8<small>°C</small></div>
+          <div class="val">67.4<small>%</small></div>
         </div>
-        <div class="chart">
-          <svg viewBox="0 0 480 110" width="100%" height="110">
-            <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F7A45" stop-opacity=".22"/><stop offset="1" stop-color="#2F7A45" stop-opacity="0"/></linearGradient></defs>
-            <path d="M0,75 C40,35 70,28 100,50 S160,95 200,72 S260,35 300,57 S360,88 400,55 S450,20 480,28 L480,110 L0,110Z" fill="url(#g)"/>
-            <path d="M0,75 C40,35 70,28 100,50 S160,95 200,72 S260,35 300,57 S360,88 400,55 S450,20 480,28" fill="none" stroke="#2F7A45" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <svg class="wave" viewBox="0 0 460 110">
+          <path d="M0,80 C40,40 70,30 100,55 S160,100 200,75 S260,35 300,58 S360,92 400,58 S440,22 460,28" fill="none" stroke="#F4EEE1" stroke-width="7" stroke-linecap="round"/>
+          <circle cx="460" cy="28" r="9" fill="#1E3B2F" stroke="#F4EEE1" stroke-width="4"/>
+        </svg>
       </div>
+      <div class="base"></div>
     </div>
-    <div class="base"></div>
+
+    <div class="abs pill pd" style="left:110px;top:70px;transform:rotate(-5deg)">Build with Antigravity</div>
+    <div class="abs pill pl" style="left:300px;top:585px;transform:rotate(-3deg)">Firebase Realtime DB</div>
+    <div class="abs pill pl" style="left:-10px;top:560px;transform:rotate(4deg)">Connect IoT sensors</div>
+    <div class="abs pill pd" style="left:90px;top:690px;transform:rotate(-2deg)">Visualize live data</div>
+
+    <svg class="abs" style="left:-20px;top:780px" width="640" height="90" viewBox="0 0 640 90">
+      <path d="M0,60 C120,90 220,20 340,50 S520,70 560,30" fill="none" stroke="#1E3B2F" stroke-width="3" stroke-dasharray="12 10" stroke-linecap="round"/>
+      <path d="M575,8 L612,32 L572,48 L582,30Z" fill="#E2694A"/>
+    </svg>
   </div>
 
-  <div class="bottom">
-    <div>
-      <h3>Session Highlights</h3>
-      <ul>
-        <li><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E5631" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></i>Build a web dashboard using Antigravity</li>
-        <li><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E5631" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></i>Integrate Firebase Realtime Database</li>
-        <li><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E5631" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></i>Connect IoT sensor data</li>
-        <li><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E5631" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></i>Visualize live data in real time</li>
-      </ul>
+  <!-- right column -->
+  <div class="abs col">
+    <h2>Real-Time<br>Web Dashboard</h2>
+    <div class="row">
+      <div class="lab">Topic</div>
+      <div class="topic">Building a Firebase Integrated Website with Real-Time IoT Data</div>
     </div>
-    <div class="divider"></div>
-    <div>
-      <h3>Resource Person</h3>
-      <div class="name disp">Sathya M</div>
+    <div class="row">
+      <div class="lab">Tools</div>
+      <div class="big or">Antigravity + Firebase</div>
+    </div>
+    <div class="row">
+      <div class="lab">Format</div>
+      <div class="big">Hands-on</div>
+      <div class="sub">Build and connect it live, step by step</div>
     </div>
   </div>
+
+  <div class="abs rp">
+    <div class="lab">Resource Person</div>
+    <div class="name">Sathya M</div>
+    <div class="bar"></div>
+  </div>
+
+  <svg class="abs foot-wave" viewBox="0 0 1200 40" preserveAspectRatio="none"><path d="M0,40 H1200 V20 C1000,4 860,30 620,18 C400,6 200,34 0,24Z" fill="#1E3B2F"/></svg>
+  <div class="abs foot">Build dashboards. Stream sensor data.<br><b>Watch it update in real time.</b></div>
 </body>
 </html>
